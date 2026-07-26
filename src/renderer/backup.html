@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Backup — VT Bicicletas</title>
+  <link rel="stylesheet" href="estilo.css">
+  <style>
+    .explicacao {
+      background: var(--branco);
+      border: 1px solid var(--aco-100);
+      border-left: 3px solid var(--sinal);
+      border-radius: var(--raio);
+      padding: 0.9rem 1rem;
+      font-size: 0.87rem;
+      line-height: 1.5;
+      margin-bottom: 1.1rem;
+    }
+    .explicacao strong { color: var(--aco-900); }
+  </style>
+</head>
+<body>
+  <script src="menu.js"></script>
+
+  <main class="conteudo">
+    <h1 class="titulo-pagina">Backup</h1>
+    <p class="subtitulo-pagina">Cópias de segurança de tudo: produtos, pedidos, clientes, estoque e contas.</p>
+
+    <div class="explicacao">
+      O sistema guarda uma cópia <strong>toda vez que você abre o app</strong>, uma por dia,
+      mantendo os últimos 30 dias. Se algo der errado — um reajuste aplicado por engano,
+      um arquivo corrompido — dá para voltar para qualquer uma dessas cópias.
+      <br><br>
+      As cópias ficam no mesmo computador. Para se proteger de um HD queimado,
+      copie a pasta para um pen drive de vez em quando.
+    </div>
+
+    <div class="cartao">
+      <h2 class="secao">Onde ficam os dados</h2>
+      <p style="font-size: 0.84rem; color: var(--aco-500); margin: -0.3rem 0 0.6rem;">
+        Todo o sistema vive num arquivo só. É esse arquivo que você copia para o pen drive.
+      </p>
+      <div style="font-family: var(--face-numero); font-size: 0.8rem; background: var(--papel);
+                  border: 1px solid var(--aco-100); border-radius: var(--raio);
+                  padding: 0.6rem 0.7rem; word-break: break-all; margin-bottom: 0.8rem;"
+           id="caminho-dados">carregando...</div>
+      <div class="acoes-esq">
+        <button id="btn-fazer">Fazer cópia agora</button>
+        <button class="neutro" id="btn-pasta">Abrir pasta das cópias</button>
+        <button class="neutro" id="btn-dados">Abrir pasta dos dados</button>
+      </div>
+    </div>
+
+    <div class="cartao">
+      <h2 class="secao">Cópias guardadas</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Quando</th>
+            <th>Tipo</th>
+            <th class="num">Tamanho</th>
+            <th style="width: 1%;"></th>
+          </tr>
+        </thead>
+        <tbody id="lista"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script>
+    const listaEl = document.getElementById('lista');
+
+    function formatarTamanho(bytes) {
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+      return `${(bytes / 1048576).toFixed(1)} MB`;
+    }
+
+    function formatarQuando(iso) {
+      const d = new Date(iso);
+      return d.toLocaleString('pt-BR', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+    }
+
+    function tipoEtiqueta(b) {
+      if (b.arquivo.includes('antes-de-restaurar')) return '<span class="etiqueta atencao">Antes de restaurar</span>';
+      if (b.manual) return '<span class="etiqueta neutra">Feita por você</span>';
+      return '<span class="etiqueta ok">Automática</span>';
+    }
+
+    async function carregar() {
+      const backups = await window.erpAPI.backup.listar();
+      listaEl.innerHTML = backups.length
+        ? backups.map(b => `
+            <tr>
+              <td>${formatarQuando(b.quando)}</td>
+              <td>${tipoEtiqueta(b)}</td>
+              <td class="num">${formatarTamanho(b.tamanho)}</td>
+              <td>
+                <button class="neutro mini" data-restaurar="${b.arquivo}">Voltar para esta</button>
+              </td>
+            </tr>`).join('')
+        : '<tr><td colspan="4" class="vazio">Nenhuma cópia ainda. Use o botão acima para fazer a primeira.</td></tr>';
+
+      listaEl.querySelectorAll('button[data-restaurar]').forEach(botao => {
+        botao.addEventListener('click', async () => {
+          const arquivo = botao.dataset.restaurar;
+          const aviso =
+            'Voltar para esta cópia substitui todos os dados atuais.\n\n' +
+            'Tudo que foi feito depois dela — pedidos, clientes, movimentações — vai sumir.\n' +
+            'Uma cópia do estado atual é guardada antes, por segurança.\n\n' +
+            'O app vai fechar e abrir de novo. Continuar?';
+          if (!confirm(aviso)) return;
+          try {
+            await window.erpAPI.backup.restaurar(arquivo);
+          } catch (erro) {
+            alert(`Não deu para restaurar: ${erro.message}`);
+          }
+        });
+      });
+    }
+
+    document.getElementById('btn-fazer').addEventListener('click', async () => {
+      const r = await window.erpAPI.backup.fazer();
+      await carregar();
+      alert(r ? `Cópia feita: ${r.arquivo}` : 'Não havia banco de dados para copiar ainda.');
+    });
+
+    document.getElementById('btn-pasta').addEventListener('click', () => {
+      window.erpAPI.backup.abrirPasta();
+    });
+
+    document.getElementById('btn-dados').addEventListener('click', () => {
+      window.erpAPI.backup.abrirDados();
+    });
+
+    async function mostrarCaminho() {
+      const c = await window.erpAPI.backup.caminhos();
+      document.getElementById('caminho-dados').textContent = c.banco;
+    }
+
+    mostrarCaminho();
+    carregar();
+  </script>
+</body>
+</html>

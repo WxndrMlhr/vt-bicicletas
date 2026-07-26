@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Estoque — VT Bicicletas</title>
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <script src="menu.js"></script>
+
+  <main class="conteudo">
+    <h1 class="titulo-pagina">Estoque</h1>
+    <p class="subtitulo-pagina">Quanto tem de cada peça, o que está acabando e tudo que entrou e saiu.</p>
+
+    <div class="grade-4" style="margin-bottom: 1.1rem;">
+      <div class="indicador"><div class="rotulo">Peças em estoque</div><div class="valor" id="i-pecas">—</div></div>
+      <div class="indicador positivo"><div class="rotulo">Valor em estoque</div><div class="valor" id="i-valor">—</div></div>
+      <div class="indicador alerta"><div class="rotulo">Abaixo do mínimo</div><div class="valor" id="i-minimo">—</div></div>
+      <div class="indicador"><div class="rotulo">Sem nenhuma peça</div><div class="valor" id="i-zerados">—</div></div>
+    </div>
+
+    <div id="painel-alerta"></div>
+
+    <div class="grade-larga">
+      <section>
+        <div class="cartao">
+          <div class="filtros" style="margin-bottom: 0.9rem;">
+            <div style="flex: 1;">
+              <label class="campo" for="filtro">Procurar peça</label>
+              <input type="text" id="filtro" placeholder="Nome ou categoria">
+            </div>
+            <div class="direita">
+              <button class="neutro" id="btn-so-baixo">Só o que está acabando</button>
+            </div>
+          </div>
+
+          <div class="rolagem">
+            <table>
+              <thead>
+                <tr>
+                  <th>Peça</th>
+                  <th class="num">Em estoque</th>
+                  <th class="num">Mínimo</th>
+                  <th>Situação</th>
+                </tr>
+              </thead>
+              <tbody id="lista"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="cartao" id="painel-item">
+          <p class="vazio">Escolha uma peça na lista para registrar entrada, saída ou ajustar a contagem.</p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const listaEl = document.getElementById('lista');
+    const itemEl = document.getElementById('painel-item');
+    let selecionado = null;
+    let mostrandoSoBaixo = false;
+
+    const real = v => (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const escapar = t => String(t ?? '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+
+    function formatarData(texto) {
+      if (!texto) return '-';
+      const [data, hora] = texto.split(' ');
+      const [a, m, d] = data.split('-');
+      return `${d}/${m}` + (hora ? ` ${hora.slice(0, 5)}` : '');
+    }
+
+    function situacao(p) {
+      if (p.estoque <= 0) return '<span class="etiqueta critica">Sem estoque</span>';
+      if (p.estoque_minimo > 0 && p.estoque <= p.estoque_minimo) return '<span class="etiqueta atencao">Acabando</span>';
+      return '<span class="etiqueta ok">Ok</span>';
+    }
+
+    async function atualizarIndicadores() {
+      const r = await window.erpAPI.estoque.resumo();
+      document.getElementById('i-pecas').textContent = r.pecas_em_estoque;
+      document.getElementById('i-valor').textContent = real(r.valor_estoque);
+      document.getElementById('i-minimo').textContent = r.abaixo_minimo;
+      document.getElementById('i-zerados').textContent = r.zerados;
+
+      const baixo = await window.erpAPI.estoque.baixo();
+      document.getElementById('painel-alerta').innerHTML = baixo.length
+        ? `<div class="cartao" style="border-left: 3px solid var(--oxido);">
+             <h2 class="secao" style="margin-bottom:0.5rem;">Precisa repor</h2>
+             <div style="display:flex; flex-wrap:wrap; gap:0.4rem;">
+               ${baixo.slice(0, 12).map(p => `
+                 <span class="etiqueta atencao">${escapar(p.nome)} — ${p.estoque} de ${p.estoque_minimo}</span>
+               `).join('')}
+               ${baixo.length > 12 ? `<span class="etiqueta neutra">+${baixo.length - 12} peças</span>` : ''}
+             </div>
+           </div>`
+        : '';
+    }
+
+    async function carregarLista() {
+      const termo = document.getElementById('filtro').value.trim();
+      let itens = mostrandoSoBaixo
+        ? await window.erpAPI.estoque.baixo()
+        : await window.erpAPI.estoque.listar(termo);
+
+      if (mostrandoSoBaixo && termo) {
+        itens = itens.filter(p => p.nome.toLowerCase().includes(termo.toLowerCase()));
+      }
+
+      if (itens.length === 0) {
+        listaEl.innerHTML = `<tr><td colspan="4" class="vazio">${
+          mostrandoSoBaixo ? 'Nada abaixo do mínimo. Estoque tranquilo.' : 'Nenhuma peça encontrada com esse nome.'
+        }</td></tr>`;
+        return;
+      }
+
+      listaEl.innerHTML = itens.map(p => `
+        <tr class="clicavel ${selecionado === p.id ? 'selecionada' : ''}" data-id="${p.id}">
+          <td>${escapar(p.nome)}<br><span style="color:var(--aco-500); font-size:0.78rem;">${escapar(p.categoria) || '—'}</span></td>
+          <td class="num" style="font-weight:700;">${p.estoque}</td>
+          <td class="num">${p.estoque_minimo || '—'}</td>
+          <td>${situacao(p)}</td>
+        </tr>
+      `).join('');
+    }
+
+    listaEl.addEventListener('click', async (e) => {
+      const linha = e.target.closest('tr[data-id]');
+      if (!linha) return;
+      selecionado = Number(linha.dataset.id);
+      document.querySelectorAll('#lista tr').forEach(tr => tr.classList.remove('selecionada'));
+      linha.classList.add('selecionada');
+      await mostrarItem(selecionado);
+    });
+
+    async function mostrarItem(id) {
+      const peca = (await window.erpAPI.estoque.listar('')).find(p => p.id === id);
+      if (!peca) return;
+      const historico = await window.erpAPI.estoque.historico(id);
+
+      itemEl.innerHTML = `
+        <h2 class="secao">Movimentar peça</h2>
+        <div style="font-family: var(--face-titulo); font-size: 1.15rem; line-height:1.25;">${escapar(peca.nome)}</div>
+        <div style="color: var(--aco-500); font-size: 0.85rem; margin-bottom: 1rem;">
+          ${escapar(peca.categoria) || 'Sem categoria'} · em estoque: <strong class="dinheiro">${peca.estoque}</strong>
+        </div>
+
+        <div class="linha-campos c2">
+          <div>
+            <label class="campo" for="m-qtd">Quantidade</label>
+            <input type="number" id="m-qtd" min="1" value="1">
+          </div>
+          <div>
+            <label class="campo" for="m-motivo">Motivo</label>
+            <input type="text" id="m-motivo" placeholder="Compra, perda, devolução...">
+          </div>
+        </div>
+        <div class="acoes" style="margin-bottom: 1.2rem;">
+          <button class="neutro" id="btn-saida">Registrar saída</button>
+          <button id="btn-entrada">Registrar entrada</button>
+        </div>
+
+        <h2 class="secao">Contagem e mínimo</h2>
+        <div class="linha-campos c2">
+          <div>
+            <label class="campo" for="m-saldo">Saldo contado</label>
+            <input type="number" id="m-saldo" value="${peca.estoque}">
+          </div>
+          <div>
+            <label class="campo" for="m-minimo">Avisar quando chegar em</label>
+            <input type="number" id="m-minimo" min="0" value="${peca.estoque_minimo}">
+          </div>
+        </div>
+        <div class="acoes" style="margin-bottom: 1.2rem;">
+          <button class="neutro" id="btn-minimo">Salvar mínimo</button>
+          <button class="escuro" id="btn-ajustar">Corrigir para o saldo contado</button>
+        </div>
+
+        <h2 class="secao">Últimas movimentações</h2>
+        <table>
+          <thead><tr><th>Quando</th><th>O que</th><th class="num">Qtd</th><th>Motivo</th></tr></thead>
+          <tbody>
+            ${historico.length
+              ? historico.slice(0, 12).map(m => `
+                  <tr>
+                    <td>${formatarData(m.criado_em)}</td>
+                    <td>${m.tipo === 'entrada'
+                          ? '<span class="etiqueta ok">Entrada</span>'
+                          : '<span class="etiqueta neutra">Saída</span>'}</td>
+                    <td class="num">${m.quantidade}</td>
+                    <td style="font-size:0.82rem; color:var(--aco-500);">${escapar(m.motivo) || '—'}</td>
+                  </tr>`).join('')
+              : '<tr><td colspan="4" class="vazio">Nenhuma movimentação registrada ainda.</td></tr>'}
+          </tbody>
+        </table>
+      `;
+
+      const qtd = () => Math.max(1, Number(document.getElementById('m-qtd').value) || 1);
+      const motivo = () => document.getElementById('m-motivo').value.trim();
+
+      async function recarregar() {
+        await carregarLista();
+        await atualizarIndicadores();
+        await mostrarItem(id);
+      }
+
+      document.getElementById('btn-entrada').addEventListener('click', async () => {
+        await window.erpAPI.estoque.movimentar({ produto_id: id, tipo: 'entrada', quantidade: qtd(), motivo: motivo() || 'Entrada' });
+        recarregar();
+      });
+
+      document.getElementById('btn-saida').addEventListener('click', async () => {
+        await window.erpAPI.estoque.movimentar({ produto_id: id, tipo: 'saida', quantidade: qtd(), motivo: motivo() || 'Saída' });
+        recarregar();
+      });
+
+      document.getElementById('btn-ajustar').addEventListener('click', async () => {
+        const saldo = Number(document.getElementById('m-saldo').value);
+        if (Number.isNaN(saldo)) { alert('Informe o saldo contado.'); return; }
+        await window.erpAPI.estoque.ajustar(id, saldo, motivo() || 'Ajuste de contagem');
+        recarregar();
+      });
+
+      document.getElementById('btn-minimo').addEventListener('click', async () => {
+        const minimo = Math.max(0, Number(document.getElementById('m-minimo').value) || 0);
+        await window.erpAPI.estoque.definirMinimo(id, minimo);
+        recarregar();
+      });
+    }
+
+    document.getElementById('btn-so-baixo').addEventListener('click', (e) => {
+      mostrandoSoBaixo = !mostrandoSoBaixo;
+      e.target.textContent = mostrandoSoBaixo ? 'Ver todas as peças' : 'Só o que está acabando';
+      e.target.className = mostrandoSoBaixo ? 'escuro' : 'neutro';
+      carregarLista();
+    });
+
+    let t;
+    document.getElementById('filtro').addEventListener('input', () => {
+      clearTimeout(t);
+      t = setTimeout(carregarLista, 200);
+    });
+
+    atualizarIndicadores();
+    carregarLista();
+  </script>
+</body>
+</html>

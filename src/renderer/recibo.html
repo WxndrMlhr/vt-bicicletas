@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Recibo</title>
+  <style>
+    /* LARGURA DO PAPEL
+       Mini impressoras costumam ser 58mm ou 80mm.
+       Se o cupom sair cortado ou muito estreito, troque o valor abaixo. */
+    :root { --largura-papel: 72mm; }  /* use ~48mm para papel de 58mm */
+
+    @page { margin: 0; }
+
+    body {
+      margin: 0;
+      padding: 3mm 2mm;
+      width: var(--largura-papel);
+      font-family: "Courier New", monospace;
+      font-size: 11px;
+      line-height: 1.35;
+      color: #000;
+      background: #fff;
+    }
+
+    .centro { text-align: center; }
+
+    .logo-cupom {
+      width: 38mm;
+      max-width: 90%;
+      height: auto;
+      margin-bottom: 2mm;
+      /* Aumenta o contraste: impressora térmica só imprime preto ou nada */
+      filter: grayscale(100%) contrast(180%);
+    }
+    .negrito { font-weight: bold; }
+    .loja { font-size: 15px; font-weight: bold; }
+    .sub { font-size: 10px; }
+
+    hr {
+      border: none;
+      border-top: 1px dashed #000;
+      margin: 6px 0;
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+    td { vertical-align: top; padding: 1px 0; }
+    td.num { text-align: right; white-space: nowrap; padding-left: 4px; }
+
+    .item-nome { font-size: 10.5px; }
+    .detalhe { font-size: 10px; color: #000; }
+
+    .total-linha {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      font-weight: bold;
+      margin-top: 4px;
+    }
+
+    .aviso {
+      font-size: 9.5px;
+      text-align: center;
+      margin-top: 6px;
+    }
+
+    .rodape {
+      text-align: center;
+      font-size: 9.5px;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Logo no cupom.
+       Impressora térmica imprime imagem com pouca definição e gasta mais papel.
+       Se sair borrada ou muito escura, apague as 2 linhas abaixo — o nome em
+       texto continua aparecendo normalmente. -->
+  <div class="centro"><img src="logo-recibo.png" class="logo-cupom" alt=""></div>
+
+  <div class="centro loja">V.T. BICICLETAS</div>
+  <div class="centro sub">O seu fornecedor completo de peças</div>
+  <div class="centro sub">Tel: (21) 98332-0678</div>
+  <div class="centro sub">R. Antônio Pacheco, 40 - Carmari</div>
+  <div class="centro sub">Nova Iguaçu / RJ</div>
+
+  <hr>
+
+  <div id="cabecalho"></div>
+
+  <hr>
+
+  <table id="itens"></table>
+
+  <hr>
+
+  <div class="total-linha">
+    <span>TOTAL</span>
+    <span id="total"></span>
+  </div>
+
+  <div class="aviso" id="aviso"></div>
+
+  <div class="rodape">
+    Obrigado pela preferência!<br>
+    Este documento não é fiscal.
+  </div>
+
+  <script>
+    function formatarReal(v) {
+      return (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    const nomesForma = {
+      prazo: 'A prazo',
+      vista: 'À vista',
+      vista_retirada: 'À vista c/ retirada em loja'
+    };
+
+    // O processo principal envia os dados do pedido por aqui.
+    window.erpAPI.aoReceberRecibo((pedido) => {
+      const data = new Date(pedido.criado_em || Date.now());
+      const dataTexto = data.toLocaleString('pt-BR', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+
+      document.getElementById('cabecalho').innerHTML = `
+        <div><span class="negrito">Pedido:</span> #${pedido.id ?? '-'}</div>
+        <div><span class="negrito">Data:</span> ${dataTexto}</div>
+        ${pedido.cliente ? `<div><span class="negrito">Cliente:</span> ${pedido.cliente}</div>` : ''}
+        <div><span class="negrito">Pagamento:</span> ${nomesForma[pedido.forma_pagamento] || pedido.forma_pagamento}</div>
+      `;
+
+      document.getElementById('itens').innerHTML = pedido.itens.map(i => `
+        <tr>
+          <td colspan="2" class="item-nome">${i.nome}</td>
+        </tr>
+        <tr>
+          <td class="detalhe">${i.quantidade} x ${formatarReal(i.preco_unitario)}</td>
+          <td class="num">${formatarReal(i.subtotal)}</td>
+        </tr>
+      `).join('');
+
+      document.getElementById('total').textContent = formatarReal(pedido.total);
+
+      if (pedido.total >= 2000) {
+        document.getElementById('aviso').textContent =
+          '* Preço de retirada aplicado - entrega grátis em compras acima de R$ 2.000,00';
+      }
+
+      // Avisa o processo principal que o recibo está pronto para imprimir.
+      window.erpAPI.reciboPronto();
+    });
+  </script>
+</body>
+</html>

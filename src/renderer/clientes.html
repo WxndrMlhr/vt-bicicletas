@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Clientes — VT Bicicletas</title>
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <script src="menu.js"></script>
+
+  <main class="conteudo">
+    <h1 class="titulo-pagina">Clientes</h1>
+    <p class="subtitulo-pagina">Quem compra na loja, o que já levou e o que ainda deve.</p>
+
+    <div class="grade-larga">
+      <section>
+        <div class="cartao">
+          <div class="filtros" style="margin-bottom: 0.9rem;">
+            <div style="flex: 1;">
+              <label class="campo" for="filtro">Procurar</label>
+              <input type="text" id="filtro" placeholder="Nome ou telefone">
+            </div>
+            <button class="escuro" id="btn-novo">Novo cliente</button>
+          </div>
+
+          <div class="rolagem">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Telefone</th>
+                  <th class="num">Pedidos</th>
+                  <th class="num">Total comprado</th>
+                </tr>
+              </thead>
+              <tbody id="lista"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="cartao" id="painel-ficha">
+          <p class="vazio">Escolha um cliente para ver a ficha, ou cadastre um novo.</p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const nomesForma = { prazo: 'A prazo', vista: 'À vista', vista_retirada: 'À vista c/ retirada' };
+
+    const listaEl = document.getElementById('lista');
+    const fichaEl = document.getElementById('painel-ficha');
+    let selecionado = null;
+
+    const real = v => (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const escapar = t => String(t ?? '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+
+    function formatarData(texto) {
+      if (!texto) return '-';
+      const [data, hora] = texto.split(' ');
+      const [a, m, d] = data.split('-');
+      return `${d}/${m}/${a}` + (hora ? ` ${hora.slice(0, 5)}` : '');
+    }
+
+    async function carregarLista(termo = '') {
+      const clientes = termo
+        ? await window.erpAPI.clientes.buscar(termo)
+        : await window.erpAPI.clientes.listar();
+
+      if (clientes.length === 0) {
+        listaEl.innerHTML = `<tr><td colspan="4" class="vazio">${
+          termo ? 'Nenhum cliente com esse nome ou telefone.' : 'Nenhum cliente cadastrado. Comece pelo botão “Novo cliente”.'
+        }</td></tr>`;
+        return;
+      }
+
+      listaEl.innerHTML = clientes.map(c => `
+        <tr class="clicavel ${selecionado === c.id ? 'selecionada' : ''}" data-id="${c.id}">
+          <td>${escapar(c.nome)}</td>
+          <td>${escapar(c.telefone) || '-'}</td>
+          <td class="num">${c.total_pedidos ?? 0}</td>
+          <td class="num">${real(c.total_comprado ?? 0)}</td>
+        </tr>
+      `).join('');
+    }
+
+    listaEl.addEventListener('click', async (e) => {
+      const linha = e.target.closest('tr[data-id]');
+      if (!linha) return;
+      selecionado = Number(linha.dataset.id);
+      document.querySelectorAll('#lista tr').forEach(tr => tr.classList.remove('selecionada'));
+      linha.classList.add('selecionada');
+      mostrarFicha(await window.erpAPI.clientes.ficha(selecionado));
+    });
+
+    function mostrarFicha(c) {
+      if (!c) return;
+      fichaEl.innerHTML = `
+        <h2 class="secao">Ficha do cliente</h2>
+        <div style="font-family: var(--face-titulo); font-size: 1.25rem; margin-bottom: 0.15rem;">${escapar(c.nome)}</div>
+        <div style="color: var(--aco-500); font-size: 0.85rem; margin-bottom: 1rem;">
+          ${escapar(c.telefone) || 'Sem telefone'}${c.endereco ? ' · ' + escapar(c.endereco) : ''}
+        </div>
+
+        <div class="grade-3" style="margin-bottom: 1rem;">
+          <div class="indicador">
+            <div class="rotulo">Pedidos</div>
+            <div class="valor">${c.total_pedidos}</div>
+          </div>
+          <div class="indicador positivo">
+            <div class="rotulo">Comprou</div>
+            <div class="valor">${real(c.total_comprado)}</div>
+          </div>
+          <div class="indicador ${c.em_aberto > 0 ? 'alerta' : ''}">
+            <div class="rotulo">Em aberto</div>
+            <div class="valor">${real(c.em_aberto)}</div>
+          </div>
+        </div>
+
+        ${c.observacoes ? `<div class="cartao" style="background: var(--papel); margin-bottom: 1rem;">
+          <div class="rotulo" style="font-size:0.72rem; text-transform:uppercase; color:var(--aco-500); letter-spacing:0.06em;">Observações</div>
+          <div style="margin-top:0.3rem;">${escapar(c.observacoes)}</div>
+        </div>` : ''}
+
+        <h2 class="secao">Últimos pedidos</h2>
+        <table>
+          <thead><tr><th>#</th><th>Data</th><th>Pagamento</th><th class="num">Total</th></tr></thead>
+          <tbody>
+            ${c.pedidos.length
+              ? c.pedidos.map(p => `
+                  <tr style="${p.cancelado ? 'opacity:0.55;' : ''}">
+                    <td>#${p.id}</td>
+                    <td>${formatarData(p.criado_em)}</td>
+                    <td>${p.cancelado
+                          ? '<span class="etiqueta critica">Cancelado</span>'
+                          : (nomesForma[p.forma_pagamento] || p.forma_pagamento)}</td>
+                    <td class="num" style="${p.cancelado ? 'text-decoration: line-through;' : ''}">${real(p.total)}</td>
+                  </tr>`).join('')
+              : '<tr><td colspan="4" class="vazio">Ainda não comprou nada.</td></tr>'}
+          </tbody>
+        </table>
+
+        <div class="acoes" style="margin-top: 1.1rem;">
+          <button class="perigo mini" id="btn-excluir">Excluir</button>
+          <button class="neutro" id="btn-editar">Editar dados</button>
+        </div>
+      `;
+
+      document.getElementById('btn-editar').addEventListener('click', () => abrirFormulario(c));
+      document.getElementById('btn-excluir').addEventListener('click', async () => {
+        if (!confirm(`Excluir ${c.nome}? Os pedidos dele continuam no histórico, mas sem vínculo com o cliente.`)) return;
+        await window.erpAPI.clientes.excluir(c.id);
+        selecionado = null;
+        fichaEl.innerHTML = '<p class="vazio">Cliente excluído.</p>';
+        carregarLista(document.getElementById('filtro').value.trim());
+      });
+    }
+
+    function abrirFormulario(cliente = null) {
+      const editando = Boolean(cliente);
+      fichaEl.innerHTML = `
+        <h2 class="secao">${editando ? 'Editar cliente' : 'Novo cliente'}</h2>
+        <div class="linha-campos">
+          <div>
+            <label class="campo" for="f-nome">Nome</label>
+            <input type="text" id="f-nome" value="${escapar(cliente?.nome)}" placeholder="Nome do cliente">
+          </div>
+        </div>
+        <div class="linha-campos c2">
+          <div>
+            <label class="campo" for="f-telefone">Telefone</label>
+            <input type="text" id="f-telefone" value="${escapar(cliente?.telefone)}" placeholder="(21) 90000-0000">
+          </div>
+          <div>
+            <label class="campo" for="f-endereco">Endereço</label>
+            <input type="text" id="f-endereco" value="${escapar(cliente?.endereco)}" placeholder="Rua, número, bairro">
+          </div>
+        </div>
+        <div class="linha-campos">
+          <div>
+            <label class="campo" for="f-obs">Observações</label>
+            <textarea id="f-obs" placeholder="Combinados de pagamento, preferências, o que for útil lembrar">${escapar(cliente?.observacoes)}</textarea>
+          </div>
+        </div>
+        <div class="acoes">
+          <button class="neutro" id="f-cancelar">Cancelar</button>
+          <button id="f-salvar">${editando ? 'Salvar alterações' : 'Cadastrar cliente'}</button>
+        </div>
+      `;
+
+      document.getElementById('f-cancelar').addEventListener('click', async () => {
+        if (editando) mostrarFicha(await window.erpAPI.clientes.ficha(cliente.id));
+        else fichaEl.innerHTML = '<p class="vazio">Escolha um cliente para ver a ficha, ou cadastre um novo.</p>';
+      });
+
+      document.getElementById('f-salvar').addEventListener('click', async () => {
+        const dados = {
+          nome: document.getElementById('f-nome').value.trim(),
+          telefone: document.getElementById('f-telefone').value.trim(),
+          endereco: document.getElementById('f-endereco').value.trim(),
+          observacoes: document.getElementById('f-obs').value.trim()
+        };
+        if (!dados.nome) {
+          alert('O cliente precisa de um nome.');
+          return;
+        }
+        if (editando) {
+          await window.erpAPI.clientes.atualizar(cliente.id, dados);
+          selecionado = cliente.id;
+        } else {
+          selecionado = await window.erpAPI.clientes.adicionar(dados);
+        }
+        await carregarLista(document.getElementById('filtro').value.trim());
+        mostrarFicha(await window.erpAPI.clientes.ficha(selecionado));
+      });
+
+      document.getElementById('f-nome').focus();
+    }
+
+    document.getElementById('btn-novo').addEventListener('click', () => abrirFormulario());
+
+    let t;
+    document.getElementById('filtro').addEventListener('input', (e) => {
+      clearTimeout(t);
+      const termo = e.target.value.trim();
+      t = setTimeout(() => carregarLista(termo), 200);
+    });
+
+    carregarLista();
+  </script>
+</body>
+</html>

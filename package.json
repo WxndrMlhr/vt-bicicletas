@@ -1,0 +1,57 @@
+{
+  "name": "vt-bicicletas",
+  "version": "1.0.0",
+  "description": "Sistema de gestão da VT Bicicletas: pedidos, produtos, estoque, clientes, contas a receber e relatórios.",
+  "main": "src/main.js",
+  "author": "VT Bicicletas",
+  "license": "ISC",
+  "scripts": {
+    "start": "electron .",
+    "rebuild": "electron-rebuild -f -w better-sqlite3",
+    "dist": "electron-builder --win",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "@electron/rebuild": "^3.6.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "br.com.vtbicicletas.erp",
+    "productName": "VT Bicicletas",
+    "copyright": "VT Bicicletas",
+    "directories": {
+      "output": "instalador",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/node_modules/better-sqlite3/**"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "VT Bicicletas",
+      "artifactName": "VT-Bicicletas-Instalador-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "VT-Bicicletas-Portatil-${version}.${ext}"
+    }
+  }
+}

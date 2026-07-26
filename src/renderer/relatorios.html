@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Relatórios — VT Bicicletas</title>
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <script src="menu.js"></script>
+
+  <main class="conteudo">
+    <h1 class="titulo-pagina">Relatórios</h1>
+    <p class="subtitulo-pagina">Quanto entrou, o que mais saiu e de onde vem o faturamento.</p>
+
+    <div class="cartao">
+      <div class="filtros">
+        <div>
+          <label class="campo" for="inicio">De</label>
+          <input type="date" id="inicio">
+        </div>
+        <div>
+          <label class="campo" for="fim">Até</label>
+          <input type="date" id="fim">
+        </div>
+        <button class="escuro" id="btn-gerar">Ver período</button>
+        <div class="direita">
+          <button class="neutro mini" data-dias="0">Hoje</button>
+          <button class="neutro mini" data-dias="7">7 dias</button>
+          <button class="neutro mini" data-dias="30">30 dias</button>
+          <button class="neutro mini" data-dias="365">1 ano</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grade-4" style="margin-bottom: 1.1rem;">
+      <div class="indicador destaque"><div class="rotulo">Faturamento</div><div class="valor" id="i-fat">—</div></div>
+      <div class="indicador"><div class="rotulo">Pedidos</div><div class="valor" id="i-ped">—</div></div>
+      <div class="indicador"><div class="rotulo">Ticket médio</div><div class="valor" id="i-tic">—</div></div>
+      <div class="indicador"><div class="rotulo">Peças vendidas</div><div class="valor" id="i-ite">—</div></div>
+    </div>
+
+    <div class="grade-larga">
+      <div class="cartao">
+        <h2 class="secao">Peças que mais saíram</h2>
+        <table>
+          <thead><tr><th>Peça</th><th class="num">Qtd</th><th class="num">Faturou</th></tr></thead>
+          <tbody id="t-vendidos"></tbody>
+        </table>
+      </div>
+
+      <div>
+        <div class="cartao">
+          <h2 class="secao">Movimento por dia</h2>
+          <table>
+            <thead><tr><th>Dia</th><th class="num">Pedidos</th><th class="num">Faturou</th></tr></thead>
+            <tbody id="t-dias"></tbody>
+          </table>
+        </div>
+
+        <div class="cartao">
+          <h2 class="secao">Como pagaram</h2>
+          <table>
+            <thead><tr><th>Forma</th><th class="num">Pedidos</th><th class="num">Faturou</th></tr></thead>
+            <tbody id="t-formas"></tbody>
+          </table>
+        </div>
+
+        <div class="cartao">
+          <h2 class="secao">Por categoria</h2>
+          <table>
+            <thead><tr><th>Categoria</th><th class="num">Qtd</th><th class="num">Faturou</th></tr></thead>
+            <tbody id="t-categorias"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const nomesForma = { prazo: 'A prazo', vista: 'À vista', vista_retirada: 'À vista c/ retirada' };
+
+    const real = v => (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const escapar = t => String(t ?? '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+
+    const inicioEl = document.getElementById('inicio');
+    const fimEl = document.getElementById('fim');
+
+    function paraISO(d) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    function formatarDia(iso) {
+      const [a, m, d] = iso.split('-');
+      return `${d}/${m}`;
+    }
+    function vazio(colunas, texto) {
+      return `<tr><td colspan="${colunas}" class="vazio">${texto}</td></tr>`;
+    }
+
+    function definirPeriodo(dias) {
+      const hoje = new Date();
+      const inicio = new Date();
+      inicio.setDate(hoje.getDate() - dias);
+      inicioEl.value = paraISO(inicio);
+      fimEl.value = paraISO(hoje);
+    }
+
+    async function gerar() {
+      if (!inicioEl.value || !fimEl.value) { alert('Escolha as duas datas.'); return; }
+      if (inicioEl.value > fimEl.value) { alert('A data inicial vem antes da final.'); return; }
+
+      const r = await window.erpAPI.relatorios.gerar(inicioEl.value, fimEl.value);
+      const semVenda = 'Nenhuma venda nesse período.';
+
+      document.getElementById('i-fat').textContent = real(r.resumo.faturamento);
+      document.getElementById('i-ped').textContent = r.resumo.quantidade_pedidos;
+      document.getElementById('i-tic').textContent = real(r.resumo.ticket_medio);
+      document.getElementById('i-ite').textContent = r.resumo.total_itens;
+
+      const maxQtd = r.maisVendidos.length ? r.maisVendidos[0].quantidade : 0;
+      document.getElementById('t-vendidos').innerHTML = r.maisVendidos.length
+        ? r.maisVendidos.map(i => `
+            <tr>
+              <td>
+                ${escapar(i.nome)}
+                <div class="barra-fundo"><div class="barra" style="width:${maxQtd ? (i.quantidade / maxQtd) * 100 : 0}%"></div></div>
+              </td>
+              <td class="num" style="font-weight:700;">${i.quantidade}</td>
+              <td class="num">${real(i.faturamento)}</td>
+            </tr>`).join('')
+        : vazio(3, semVenda);
+
+      document.getElementById('t-dias').innerHTML = r.porDia.length
+        ? r.porDia.map(d => `
+            <tr><td>${formatarDia(d.dia)}</td><td class="num">${d.pedidos}</td><td class="num">${real(d.faturamento)}</td></tr>
+          `).join('')
+        : vazio(3, semVenda);
+
+      document.getElementById('t-formas').innerHTML = r.formasPagamento.length
+        ? r.formasPagamento.map(f => `
+            <tr>
+              <td>${nomesForma[f.forma_pagamento] || f.forma_pagamento}</td>
+              <td class="num">${f.pedidos}</td>
+              <td class="num">${real(f.faturamento)}</td>
+            </tr>`).join('')
+        : vazio(3, semVenda);
+
+      document.getElementById('t-categorias').innerHTML = r.categorias.length
+        ? r.categorias.map(c => `
+            <tr>
+              <td>${escapar(c.categoria)}</td>
+              <td class="num">${c.quantidade}</td>
+              <td class="num">${real(c.faturamento)}</td>
+            </tr>`).join('')
+        : vazio(3, semVenda);
+    }
+
+    document.getElementById('btn-gerar').addEventListener('click', gerar);
+
+    document.querySelectorAll('button[data-dias]').forEach(botao => {
+      botao.addEventListener('click', () => {
+        definirPeriodo(Number(botao.dataset.dias));
+        gerar();
+      });
+    });
+
+    definirPeriodo(30);
+    gerar();
+  </script>
+</body>
+</html>

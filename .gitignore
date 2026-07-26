@@ -1,0 +1,21 @@
+# Dependências — são reinstaladas com "npm install", não precisam ir pro repositório
+node_modules/
+
+# Executáveis gerados — são recriados com "npm run dist" (uns 200 MB)
+instalador/
+
+# DADOS DA LOJA — nunca subir!
+# Contém nomes e telefones de clientes, histórico de vendas e contas a receber.
+dados/
+*.db
+*.db-wal
+*.db-shm
+
+# Arquivos temporários do sistema
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Logs
+npm-debug.log*
+*.log

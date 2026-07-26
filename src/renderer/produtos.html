@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Produtos — VT Bicicletas</title>
+  <link rel="stylesheet" href="estilo.css">
+  <style>
+    .aviso-reajuste {
+      background: #FFF4EC;
+      border: 1px solid #F6C9A6;
+      border-radius: var(--raio);
+      padding: 0.7rem 0.85rem;
+      font-size: 0.85rem;
+      margin-bottom: 0.9rem;
+    }
+    .comparativo {
+      font-family: var(--face-numero);
+      font-size: 0.82rem;
+      color: var(--aco-500);
+    }
+    .comparativo strong { color: var(--aco-900); }
+  </style>
+</head>
+<body>
+  <script src="menu.js"></script>
+
+  <main class="conteudo">
+    <h1 class="titulo-pagina">Produtos</h1>
+    <p class="subtitulo-pagina">Sua tabela de preços. Clique numa peça para alterar o valor.</p>
+
+    <div class="grade-larga">
+      <section>
+        <div class="cartao">
+          <div class="filtros" style="margin-bottom: 0.9rem;">
+            <div style="flex: 1;">
+              <label class="campo" for="filtro">Procurar peça</label>
+              <input type="text" id="filtro" placeholder="Nome ou categoria">
+            </div>
+            <div class="direita">
+              <button class="neutro" id="btn-nova">Nova peça</button>
+              <button class="neutro" id="btn-reajuste">Reajustar preços</button>
+              <button class="neutro" id="btn-alteracoes">Desfazer</button>
+            </div>
+          </div>
+          <div style="color: var(--aco-500); font-size: 0.8rem; margin-bottom: 0.5rem;" id="contagem"></div>
+
+          <div class="rolagem">
+            <table>
+              <thead>
+                <tr>
+                  <th>Peça</th>
+                  <th class="num">A prazo</th>
+                  <th class="num">À vista</th>
+                  <th class="num">Retirada</th>
+                </tr>
+              </thead>
+              <tbody id="lista"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="cartao" id="painel">
+          <p class="vazio">Clique numa peça para editar, ou use “Nova peça”.</p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const listaEl = document.getElementById('lista');
+    const painelEl = document.getElementById('painel');
+    let selecionado = null;
+    let produtosCarregados = [];
+
+    const real = v => (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const escapar = t => String(t ?? '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+
+    function renderizar(produtos) {
+      produtosCarregados = produtos;
+      document.getElementById('contagem').textContent =
+        produtos.length === 1 ? '1 peça' : `${produtos.length} peças`;
+
+      listaEl.innerHTML = produtos.length
+        ? produtos.map(p => `
+            <tr class="clicavel ${selecionado === p.id ? 'selecionada' : ''}" data-id="${p.id}">
+              <td>
+                ${escapar(p.nome)}
+                <div style="color: var(--aco-500); font-size: 0.77rem;">${escapar(p.categoria) || '—'}</div>
+              </td>
+              <td class="num">${real(p.preco_prazo)}</td>
+              <td class="num">${real(p.preco_vista)}</td>
+              <td class="num">${p.preco_vista_retirada != null ? real(p.preco_vista_retirada) : '—'}</td>
+            </tr>`).join('')
+        : '<tr><td colspan="4" class="vazio">Nenhuma peça com esse nome.</td></tr>';
+    }
+
+    async function carregar() {
+      const termo = document.getElementById('filtro').value.trim();
+      renderizar(termo
+        ? await window.erpAPI.produtos.buscar(termo)
+        : await window.erpAPI.produtos.listar());
+    }
+
+    listaEl.addEventListener('click', (e) => {
+      const linha = e.target.closest('tr[data-id]');
+      if (!linha) return;
+      selecionado = Number(linha.dataset.id);
+      document.querySelectorAll('#lista tr').forEach(tr => tr.classList.remove('selecionada'));
+      linha.classList.add('selecionada');
+      abrirFormulario(produtosCarregados.find(p => p.id === selecionado));
+    });
+
+    // ---------- Formulário de peça (novo e edição usam o mesmo) ----------
+    function abrirFormulario(peca = null) {
+      const editando = Boolean(peca);
+      painelEl.innerHTML = `
+        <h2 class="secao">${editando ? 'Editar peça' : 'Nova peça'}</h2>
+        <div class="linha-campos">
+          <div>
+            <label class="campo" for="f-nome">Nome</label>
+            <input type="text" id="f-nome" value="${escapar(peca?.nome)}" placeholder="Ex: Roda livre 18 dentes">
+          </div>
+        </div>
+        <div class="linha-campos">
+          <div>
+            <label class="campo" for="f-categoria">Categoria</label>
+            <input type="text" id="f-categoria" value="${escapar(peca?.categoria)}" placeholder="Rodas, Transmissão, Freios...">
+          </div>
+        </div>
+        <div class="linha-campos c3">
+          <div>
+            <label class="campo" for="f-prazo">A prazo</label>
+            <input type="number" id="f-prazo" step="0.01" value="${peca?.preco_prazo ?? ''}" placeholder="0,00">
+          </div>
+          <div>
+            <label class="campo" for="f-vista">À vista</label>
+            <input type="number" id="f-vista" step="0.01" value="${peca?.preco_vista ?? ''}" placeholder="0,00">
+          </div>
+          <div>
+            <label class="campo" for="f-retirada">Retirada</label>
+            <input type="number" id="f-retirada" step="0.01" value="${peca?.preco_vista_retirada ?? ''}" placeholder="Vazio se não tiver">
+          </div>
+        </div>
+        <div class="acoes">
+          ${editando ? '<button class="perigo mini" id="f-excluir">Excluir peça</button>' : ''}
+          <button class="neutro" id="f-cancelar">Cancelar</button>
+          <button id="f-salvar">${editando ? 'Salvar alterações' : 'Cadastrar peça'}</button>
+        </div>
+      `;
+
+      document.getElementById('f-cancelar').addEventListener('click', () => {
+        selecionado = null;
+        painelEl.innerHTML = '<p class="vazio">Clique numa peça para editar, ou use “Nova peça”.</p>';
+        carregar();
+      });
+
+      document.getElementById('f-salvar').addEventListener('click', async () => {
+        const nome = document.getElementById('f-nome').value.trim();
+        const prazo = parseFloat(document.getElementById('f-prazo').value);
+        const vista = parseFloat(document.getElementById('f-vista').value);
+        const retiradaTexto = document.getElementById('f-retirada').value;
+
+        if (!nome) { alert('A peça precisa de um nome.'); return; }
+        if (Number.isNaN(prazo) || Number.isNaN(vista)) {
+          alert('Informe o preço a prazo e o preço à vista.');
+          return;
+        }
+
+        const dados = {
+          nome,
+          categoria: document.getElementById('f-categoria').value.trim(),
+          preco_prazo: prazo,
+          preco_vista: vista,
+          preco_vista_retirada: retiradaTexto === '' ? null : parseFloat(retiradaTexto)
+        };
+
+        if (editando) await window.erpAPI.produtos.atualizar(peca.id, dados);
+        else await window.erpAPI.produtos.adicionar(dados);
+
+        await carregar();
+        painelEl.innerHTML = `<p class="vazio">${editando ? 'Preço atualizado.' : 'Peça cadastrada.'}</p>`;
+        selecionado = null;
+      });
+
+      if (editando) {
+        document.getElementById('f-excluir').addEventListener('click', async () => {
+          if (!confirm(`Excluir "${peca.nome}" da tabela?`)) return;
+          await window.erpAPI.produtos.excluir(peca.id);
+          selecionado = null;
+          painelEl.innerHTML = '<p class="vazio">Peça excluída.</p>';
+          carregar();
+        });
+      }
+
+      document.getElementById('f-nome').focus();
+    }
+
+    // ---------- Reajuste em massa ----------
+    async function abrirReajuste() {
+      const categorias = await window.erpAPI.produtos.categorias();
+
+      painelEl.innerHTML = `
+        <h2 class="secao">Reajustar preços</h2>
+        <div class="aviso-reajuste">
+          O reajuste altera os três preços de uma vez e <strong>não tem desfazer</strong>.
+          Confira o resultado antes de aplicar.
+        </div>
+
+        <div class="linha-campos c2">
+          <div>
+            <label class="campo" for="r-percentual">Percentual</label>
+            <input type="number" id="r-percentual" step="0.1" value="5" placeholder="10">
+          </div>
+          <div>
+            <label class="campo" for="r-categoria">Aplicar em</label>
+            <select id="r-categoria">
+              <option value="">Todas as peças</option>
+              ${categorias.map(c => `<option value="${escapar(c.categoria)}">${escapar(c.categoria)} (${c.quantidade})</option>`).join('')}
+            </select>
+          </div>
+        </div>
+
+        <p style="font-size: 0.82rem; color: var(--aco-500); margin: -0.3rem 0 0.9rem;">
+          Use número negativo para baixar. Ex: <strong>-5</strong> reduz 5%.
+        </p>
+
+        <h2 class="secao">Como vai ficar</h2>
+        <table>
+          <thead><tr><th>Peça</th><th class="num">Hoje</th><th class="num">Depois</th></tr></thead>
+          <tbody id="r-previa"></tbody>
+        </table>
+
+        <div class="acoes" style="margin-top: 1rem;">
+          <button class="neutro" id="r-cancelar">Cancelar</button>
+          <button id="r-aplicar">Aplicar reajuste</button>
+        </div>
+      `;
+
+      async function atualizarPrevia() {
+        const perc = parseFloat(document.getElementById('r-percentual').value) || 0;
+        const cat = document.getElementById('r-categoria').value;
+        const fator = 1 + perc / 100;
+
+        const todos = await window.erpAPI.produtos.listar();
+        const alvo = cat ? todos.filter(p => p.categoria === cat) : todos;
+
+        document.getElementById('r-previa').innerHTML = alvo.length
+          ? alvo.slice(0, 8).map(p => `
+              <tr>
+                <td style="font-size:0.82rem;">${escapar(p.nome)}</td>
+                <td class="num comparativo">${real(p.preco_vista)}</td>
+                <td class="num comparativo"><strong>${real(Math.round(p.preco_vista * fator * 100) / 100)}</strong></td>
+              </tr>`).join('') +
+              (alvo.length > 8
+                ? `<tr><td colspan="3" style="color:var(--aco-500); font-size:0.8rem;">…e mais ${alvo.length - 8} peças</td></tr>`
+                : '')
+          : '<tr><td colspan="3" class="vazio">Nenhuma peça nessa categoria.</td></tr>';
+      }
+
+      document.getElementById('r-percentual').addEventListener('input', atualizarPrevia);
+      document.getElementById('r-categoria').addEventListener('change', atualizarPrevia);
+
+      document.getElementById('r-cancelar').addEventListener('click', () => {
+        painelEl.innerHTML = '<p class="vazio">Clique numa peça para editar, ou use “Nova peça”.</p>';
+      });
+
+      document.getElementById('r-aplicar').addEventListener('click', async () => {
+        const perc = parseFloat(document.getElementById('r-percentual').value);
+        const cat = document.getElementById('r-categoria').value;
+        if (!perc) { alert('Informe um percentual diferente de zero.'); return; }
+
+        const onde = cat || 'todas as peças';
+        const acao = perc > 0 ? `aumentar ${perc}%` : `baixar ${Math.abs(perc)}%`;
+        if (!confirm(`Confirma ${acao} nos preços de ${onde}?\n\nNão tem como desfazer.`)) return;
+
+        const r = await window.erpAPI.produtos.reajustar(perc, cat);
+        await carregar();
+        painelEl.innerHTML = `
+          <h2 class="secao">Reajuste aplicado</h2>
+          <p style="font-size:0.9rem;">
+            ${r.afetados} ${r.afetados === 1 ? 'peça teve' : 'peças tiveram'} o preço alterado em ${perc}%.
+          </p>`;
+      });
+
+      atualizarPrevia();
+    }
+
+    // ---------- Alterações de preço e desfazer ----------
+    async function abrirAlteracoes() {
+      const alteracoes = await window.erpAPI.produtos.alteracoes();
+
+      function formatarQuando(texto) {
+        if (!texto) return '—';
+        const [data, hora] = texto.split(' ');
+        const [a, m, d] = data.split('-');
+        return `${d}/${m} ${(hora || '').slice(0, 5)}`;
+      }
+
+      painelEl.innerHTML = `
+        <h2 class="secao">Alterações de preço</h2>
+        <p style="font-size: 0.83rem; color: var(--aco-500); margin: -0.3rem 0 0.9rem;">
+          Toda mudança de preço fica registrada aqui. Desfazer devolve os valores exatos
+          que existiam antes — não é um cálculo aproximado.
+        </p>
+
+        <table>
+          <thead><tr><th>Quando</th><th>O que mudou</th><th style="width:1%;"></th></tr></thead>
+          <tbody>
+            ${alteracoes.length
+              ? alteracoes.map(a => `
+                  <tr>
+                    <td style="font-size:0.8rem; color:var(--aco-500);">${formatarQuando(a.criado_em)}</td>
+                    <td style="font-size:0.84rem;">
+                      ${escapar(a.descricao)}
+                      <div style="color:var(--aco-500); font-size:0.77rem;">
+                        ${a.quantidade} ${a.quantidade === 1 ? 'peça' : 'peças'}
+                      </div>
+                    </td>
+                    <td>
+                      ${a.desfeito
+                        ? '<span class="etiqueta neutra">Desfeito</span>'
+                        : `<button class="neutro mini" data-desfazer="${a.id}">Desfazer</button>`}
+                    </td>
+                  </tr>`).join('')
+              : '<tr><td colspan="3" class="vazio">Nenhuma alteração de preço até agora.</td></tr>'}
+          </tbody>
+        </table>
+
+        <div class="acoes" style="margin-top: 1rem;">
+          <button class="neutro" id="a-fechar">Fechar</button>
+        </div>
+      `;
+
+      document.getElementById('a-fechar').addEventListener('click', () => {
+        painelEl.innerHTML = '<p class="vazio">Clique numa peça para editar, ou use “Nova peça”.</p>';
+      });
+
+      painelEl.querySelectorAll('button[data-desfazer]').forEach(botao => {
+        botao.addEventListener('click', async () => {
+          const id = Number(botao.dataset.desfazer);
+          if (!confirm('Devolver os preços que existiam antes dessa alteração?')) return;
+          try {
+            const r = await window.erpAPI.produtos.desfazer(id);
+            await carregar();
+            await abrirAlteracoes();
+            alert(`Pronto. ${r.restaurados} ${r.restaurados === 1 ? 'peça voltou' : 'peças voltaram'} ao preço anterior.`);
+          } catch (erro) {
+            alert(`Não deu para desfazer: ${erro.message}`);
+          }
+        });
+      });
+    }
+
+    document.getElementById('btn-alteracoes').addEventListener('click', abrirAlteracoes);
+
+    document.getElementById('btn-nova').addEventListener('click', () => {
+      selecionado = null;
+      document.querySelectorAll('#lista tr').forEach(tr => tr.classList.remove('selecionada'));
+      abrirFormulario();
+    });
+
+    document.getElementById('btn-reajuste').addEventListener('click', abrirReajuste);
+
+    let t;
+    document.getElementById('filtro').addEventListener('input', () => {
+      clearTimeout(t);
+      t = setTimeout(carregar, 200);
+    });
+
+    carregar();
+  </script>
+</body>
+</html>

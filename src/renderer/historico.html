@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Pedidos — VT Bicicletas</title>
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <script src="menu.js"></script>
+
+  <main class="conteudo">
+    <h1 class="titulo-pagina">Pedidos</h1>
+    <p class="subtitulo-pagina">Tudo que já foi vendido. Clique num pedido para ver os itens e reimprimir o cupom.</p>
+
+    <div class="grade-larga">
+      <section>
+        <div class="cartao">
+          <div class="rolagem">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Data</th>
+                  <th>Cliente</th>
+                  <th>Pagamento</th>
+                  <th class="num">Total</th>
+                </tr>
+              </thead>
+              <tbody id="lista"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="cartao" id="detalhe">
+          <p class="vazio">Escolha um pedido na lista para ver os detalhes.</p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const nomesForma = { prazo: 'A prazo', vista: 'À vista', vista_retirada: 'À vista c/ retirada' };
+
+    const listaEl = document.getElementById('lista');
+    const detalheEl = document.getElementById('detalhe');
+    let selecionado = null;
+
+    const real = v => (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const escapar = t => String(t ?? '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+
+    function formatarData(texto) {
+      if (!texto) return '—';
+      const [data, hora] = texto.split(' ');
+      const [a, m, d] = data.split('-');
+      return `${d}/${m}/${a}` + (hora ? ` ${hora.slice(0, 5)}` : '');
+    }
+
+    function etiquetaForma(forma) {
+      const classe = forma === 'prazo' ? 'atencao' : 'ok';
+      return `<span class="etiqueta ${classe}">${nomesForma[forma] || forma}</span>`;
+    }
+
+    async function carregarLista() {
+      const pedidos = await window.erpAPI.pedidos.listar();
+      listaEl.innerHTML = pedidos.length
+        ? pedidos.map(p => `
+            <tr class="clicavel ${selecionado === p.id ? 'selecionada' : ''}" data-id="${p.id}"
+                style="${p.cancelado ? 'opacity:0.55;' : ''}">
+              <td class="dinheiro">#${p.id}</td>
+              <td>${formatarData(p.criado_em)}</td>
+              <td style="${p.cancelado ? 'text-decoration: line-through;' : ''}">
+                ${escapar(p.cliente) || '<span style="color:var(--aco-500)">—</span>'}
+              </td>
+              <td>${p.cancelado
+                    ? '<span class="etiqueta critica">Cancelado</span>'
+                    : etiquetaForma(p.forma_pagamento)}</td>
+              <td class="num" style="font-weight:700; ${p.cancelado ? 'text-decoration: line-through;' : ''}">
+                ${real(p.total)}
+              </td>
+            </tr>`).join('')
+        : '<tr><td colspan="5" class="vazio">Nenhum pedido registrado. Comece em “Novo pedido”.</td></tr>';
+    }
+
+    listaEl.addEventListener('click', async (e) => {
+      const linha = e.target.closest('tr[data-id]');
+      if (!linha) return;
+      selecionado = Number(linha.dataset.id);
+      document.querySelectorAll('#lista tr').forEach(tr => tr.classList.remove('selecionada'));
+      linha.classList.add('selecionada');
+      mostrarDetalhe(await window.erpAPI.pedidos.buscar(selecionado));
+    });
+
+    function mostrarDetalhe(pedido) {
+      if (!pedido) return;
+      detalheEl.innerHTML = `
+        <h2 class="secao">Pedido #${pedido.id}</h2>
+        ${pedido.cancelado ? `
+          <div style="background:#FBEFE9; border:1px solid #E8BBA6; border-left:3px solid var(--oxido);
+                      border-radius:var(--raio); padding:0.7rem 0.85rem; font-size:0.85rem; margin-bottom:0.9rem;">
+            <strong style="color:var(--oxido);">Pedido cancelado</strong>
+            em ${formatarData(pedido.cancelado_em)}.
+            ${pedido.motivo_cancelamento ? `<br>Motivo: ${escapar(pedido.motivo_cancelamento)}` : ''}
+            <br><span style="color:var(--aco-500); font-size:0.81rem;">
+              As peças voltaram ao estoque e a cobrança foi retirada. Não conta no faturamento.
+            </span>
+          </div>` : ''}
+        <div style="color: var(--aco-500); font-size: 0.85rem; margin-bottom: 1rem;">
+          ${formatarData(pedido.criado_em)} ·
+          ${escapar(pedido.cliente) || 'sem cliente'} ·
+          ${nomesForma[pedido.forma_pagamento] || pedido.forma_pagamento}
+        </div>
+
+        <table>
+          <thead>
+            <tr><th>Peça</th><th class="num">Qtd</th><th class="num">Unit.</th><th class="num">Subtotal</th></tr>
+          </thead>
+          <tbody>
+            ${pedido.itens.map(i => `
+              <tr>
+                <td>${escapar(i.nome)}</td>
+                <td class="num">${i.quantidade}</td>
+                <td class="num">${real(i.preco_unitario)}</td>
+                <td class="num">${real(i.subtotal)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:0.9rem; padding-top:0.7rem; border-top:2px solid var(--aco-900);">
+          <span style="font-family:var(--face-titulo); letter-spacing:0.1em; text-transform:uppercase; font-size:0.8rem;">Total</span>
+          <span class="dinheiro" style="font-size:1.4rem; font-weight:700;">${real(pedido.total)}</span>
+        </div>
+
+        ${pedido.total >= 2000
+          ? '<div style="text-align:right; margin-top:0.3rem;"><span class="etiqueta atencao">Preço de retirada aplicado</span></div>'
+          : ''}
+
+        <div class="acoes" style="margin-top: 1.1rem;">
+          ${pedido.cancelado ? '' : '<button class="perigo mini" id="btn-cancelar">Cancelar pedido</button>'}
+          <button id="btn-imprimir">Imprimir cupom</button>
+        </div>
+      `;
+
+      const botaoCancelar = document.getElementById('btn-cancelar');
+      if (botaoCancelar) {
+        botaoCancelar.addEventListener('click', async () => {
+          const motivo = prompt(
+            `Cancelar o pedido #${pedido.id}?\n\n` +
+            'As peças voltam ao estoque e a cobrança a prazo é retirada.\n' +
+            'O pedido continua no histórico, marcado como cancelado.\n\n' +
+            'Motivo (opcional):'
+          );
+          if (motivo === null) return; // desistiu
+
+          try {
+            const r = await window.erpAPI.pedidos.cancelar(pedido.id, motivo.trim());
+            await carregarLista();
+            mostrarDetalhe(await window.erpAPI.pedidos.buscar(pedido.id));
+            let aviso = `Pedido #${r.pedido_id} cancelado. ${r.itensDevolvidos} ${r.itensDevolvidos === 1 ? 'item voltou' : 'itens voltaram'} ao estoque.`;
+            if (r.avisoConta) aviso += `\n\nAtenção: ${r.avisoConta}`;
+            alert(aviso);
+          } catch (erro) {
+            alert(`Não deu para cancelar: ${erro.message}`);
+          }
+        });
+      }
+
+      document.getElementById('btn-imprimir').addEventListener('click', async (ev) => {
+        const botao = ev.target;
+        botao.disabled = true;
+        botao.textContent = 'Imprimindo...';
+        try {
+          await window.erpAPI.impressao.imprimir(pedido.id, { silencioso: false });
+        } catch (erro) {
+          alert(`Não deu para imprimir: ${erro.message}`);
+        }
+        botao.disabled = false;
+        botao.textContent = 'Imprimir cupom';
+      });
+    }
+
+    carregarLista();
+  </script>
+</body>
+</html>

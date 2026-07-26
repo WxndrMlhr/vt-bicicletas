@@ -1,0 +1,352 @@
+/* ============================================================
+   VT Bicicletas — sistema visual
+   Direção: balcão de oficina. Claro, legível sob luz de loja,
+   tipografia condensada industrial e números alinhados em coluna
+   como na tabela de preços impressa.
+   ============================================================ */
+
+:root {
+  /* Paleta */
+  --aco-900: #16191F;   /* texto principal, barra lateral */
+  --aco-700: #333A45;
+  --aco-500: #5C6675;   /* texto secundário */
+  --aco-300: #AAB2BD;
+  --aco-100: #DFE3E8;   /* bordas */
+  --papel:   #EFF1F3;   /* fundo da aplicação */
+  --branco:  #FFFFFF;   /* superfícies */
+
+  --sinal:      #FF7500; /* laranja da marca VT — ações e destaque */
+  --sinal-alto: #DD6200;
+  --ambar:      #FDB703; /* amarelo da marca — avisos */
+  --ambar-alto: #B98600;
+  --verde:      #1F7A4D; /* dinheiro entrando, saldo ok */
+  --oxido:      #C2410C; /* atenção, vencido, estoque zerado */
+  --azul:       #1D4E89; /* links e seleção */
+
+  /* Tipografia — todas presentes no Windows, funcionam offline */
+  --face-titulo: 'Bahnschrift', 'Archivo Narrow', 'Segoe UI Semibold', sans-serif;
+  --face-corpo:  'Segoe UI', system-ui, sans-serif;
+  --face-numero: 'Consolas', 'Cascadia Mono', monospace;
+
+  --raio: 4px;
+  --largura-menu: 208px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--papel);
+  color: var(--aco-900);
+  font-family: var(--face-corpo);
+  font-size: 14px;
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ---------- Barra lateral ---------- */
+.menu {
+  width: var(--largura-menu);
+  flex-shrink: 0;
+  background: var(--aco-900);
+  color: var(--aco-300);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.menu-marca {
+  padding: 1.1rem 1rem 1rem;
+  border-bottom: 1px solid #262B33;
+  text-align: center;
+}
+.menu-marca img {
+  width: 100%;
+  max-width: 152px;
+  height: auto;
+  display: block;
+  margin: 0 auto 0.55rem;
+}
+.menu-marca .desc {
+  font-size: 0.68rem;
+  color: var(--aco-500);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.menu nav { padding: 0.6rem 0; flex: 1; }
+
+.menu nav a {
+  display: block;
+  padding: 0.62rem 1.1rem;
+  color: var(--aco-300);
+  text-decoration: none;
+  font-size: 0.88rem;
+  border-left: 3px solid transparent;
+}
+.menu nav a:hover { background: #1E232B; color: var(--branco); }
+.menu nav a.ativo {
+  background: #1E232B;
+  color: var(--branco);
+  border-left-color: var(--sinal);
+  font-weight: 600;
+}
+
+.menu-rodape {
+  padding: 0.9rem 1.1rem;
+  font-size: 0.7rem;
+  color: var(--aco-700);
+  border-top: 1px solid #262B33;
+}
+
+/* ---------- Área de conteúdo ---------- */
+.conteudo {
+  flex: 1;
+  padding: 1.8rem 2rem 3rem;
+  min-width: 0;
+}
+
+.titulo-pagina {
+  font-family: var(--face-titulo);
+  font-size: 1.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin: 0 0 0.2rem;
+}
+.subtitulo-pagina {
+  color: var(--aco-500);
+  font-size: 0.88rem;
+  margin: 0 0 1.4rem;
+}
+
+h2.secao {
+  font-family: var(--face-titulo);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--aco-700);
+  margin: 0 0 0.8rem;
+}
+
+/* ---------- Superfícies ---------- */
+.cartao {
+  background: var(--branco);
+  border: 1px solid var(--aco-100);
+  border-radius: var(--raio);
+  padding: 1.1rem 1.2rem;
+  margin-bottom: 1.1rem;
+}
+
+.grade-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem; align-items: start; }
+.grade-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.1rem; align-items: start; }
+.grade-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.1rem; }
+.grade-larga { display: grid; grid-template-columns: 1.35fr 1fr; gap: 1.1rem; align-items: start; }
+
+/* ---------- Indicadores ---------- */
+.indicador {
+  background: var(--branco);
+  border: 1px solid var(--aco-100);
+  border-radius: var(--raio);
+  padding: 0.9rem 1rem;
+  border-top: 3px solid var(--aco-300);
+}
+.indicador.destaque { border-top-color: var(--sinal); }
+.indicador.positivo { border-top-color: var(--verde); }
+.indicador.alerta   { border-top-color: var(--oxido); }
+
+.indicador .rotulo {
+  font-size: 0.72rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--aco-500);
+  margin-bottom: 0.3rem;
+}
+.indicador .valor {
+  font-family: var(--face-numero);
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.indicador .nota { font-size: 0.75rem; color: var(--aco-500); margin-top: 0.2rem; }
+
+/* ---------- Formulários ---------- */
+label.campo {
+  display: block;
+  font-size: 0.74rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--aco-500);
+  margin-bottom: 0.28rem;
+}
+
+input, select, textarea {
+  width: 100%;
+  background: var(--branco);
+  border: 1px solid var(--aco-100);
+  border-radius: var(--raio);
+  color: var(--aco-900);
+  padding: 0.5rem 0.6rem;
+  font-size: 0.9rem;
+  font-family: var(--face-corpo);
+}
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid var(--azul);
+  outline-offset: -1px;
+  border-color: var(--azul);
+}
+input[type="number"], input.numero { font-family: var(--face-numero); text-align: right; }
+textarea { resize: vertical; min-height: 62px; }
+
+.linha-campos { display: grid; gap: 0.8rem; margin-bottom: 0.9rem; }
+.linha-campos.c2 { grid-template-columns: 1fr 1fr; }
+.linha-campos.c3 { grid-template-columns: repeat(3, 1fr); }
+.linha-campos.c4 { grid-template-columns: repeat(4, 1fr); }
+
+/* ---------- Botões ---------- */
+button {
+  font-family: var(--face-corpo);
+  font-size: 0.86rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: var(--raio);
+  padding: 0.52rem 0.95rem;
+  cursor: pointer;
+  background: var(--sinal);
+  color: var(--aco-900);
+}
+button:hover { background: var(--sinal-alto); color: var(--branco); }
+button:disabled { background: var(--aco-100); color: var(--aco-300); cursor: default; }
+
+button.neutro {
+  background: var(--branco);
+  border-color: var(--aco-100);
+  color: var(--aco-700);
+}
+button.neutro:hover { background: var(--papel); border-color: var(--aco-300); }
+
+button.escuro { background: var(--aco-900); color: var(--branco); }
+button.escuro:hover { background: var(--aco-700); }
+
+button.perigo { background: transparent; color: var(--oxido); border-color: var(--aco-100); }
+button.perigo:hover { background: #FDF0EA; border-color: var(--oxido); }
+
+button.mini { padding: 0.3rem 0.55rem; font-size: 0.78rem; }
+
+.acoes { display: flex; gap: 0.5rem; justify-content: flex-end; align-items: center; }
+.acoes-esq { display: flex; gap: 0.5rem; align-items: center; }
+
+/* ---------- Tabelas ---------- */
+table { width: 100%; border-collapse: collapse; }
+
+th {
+  text-align: left;
+  font-size: 0.71rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--aco-500);
+  font-weight: 600;
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--aco-100);
+  white-space: nowrap;
+}
+td {
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--aco-100);
+  font-size: 0.87rem;
+  vertical-align: middle;
+}
+tbody tr:last-child td { border-bottom: none; }
+
+td.num, th.num { text-align: right; font-family: var(--face-numero); white-space: nowrap; }
+th.num { font-family: var(--face-corpo); }
+
+tr.clicavel { cursor: pointer; }
+tr.clicavel:hover { background: #F7F8F9; }
+tr.selecionada { background: #EAF0F7; }
+tr.selecionada td { border-bottom-color: #D3DFEC; }
+
+.rolagem { max-height: 460px; overflow-y: auto; }
+
+/* ---------- Sinalizadores ---------- */
+.etiqueta {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0.12rem 0.42rem;
+  border-radius: 2px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+.etiqueta.ok       { color: var(--verde); border-color: #B7D9C7; background: #EDF6F1; }
+.etiqueta.atencao  { color: var(--ambar-alto); border-color: #E8D08C; background: #FCF6E4; }
+.etiqueta.critica  { color: var(--oxido); border-color: #E8BBA6; background: #FBEFE9; }
+.etiqueta.neutra   { color: var(--aco-500); border-color: var(--aco-100); background: var(--papel); }
+
+.dinheiro { font-family: var(--face-numero); }
+.positivo { color: var(--verde); }
+.negativo { color: var(--oxido); }
+
+.vazio {
+  color: var(--aco-500);
+  font-size: 0.87rem;
+  padding: 1rem 0.6rem;
+  text-align: center;
+}
+
+/* Barra proporcional usada nos rankings */
+.barra-fundo { background: var(--aco-100); border-radius: 2px; height: 5px; margin-top: 3px; overflow: hidden; }
+.barra { background: var(--sinal); height: 100%; }
+
+/* ---------- Busca com sugestões ---------- */
+.campo-busca { position: relative; }
+.sugestoes {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--branco);
+  border: 1px solid var(--aco-100);
+  border-radius: var(--raio);
+  margin-top: 3px;
+  max-height: 260px;
+  overflow-y: auto;
+  z-index: 20;
+  box-shadow: 0 8px 20px rgba(22, 25, 31, 0.12);
+}
+.sugestao {
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.86rem;
+  border-bottom: 1px solid var(--aco-100);
+}
+.sugestao:last-child { border-bottom: none; }
+.sugestao:hover { background: #F7F8F9; }
+.sugestao .apoio { color: var(--aco-500); font-family: var(--face-numero); font-size: 0.8rem; }
+
+/* ---------- Filtros em linha ---------- */
+.filtros { display: flex; gap: 0.7rem; align-items: flex-end; flex-wrap: wrap; }
+.filtros > div { min-width: 130px; }
+.filtros .direita { margin-left: auto; display: flex; gap: 0.4rem; }
+
+.abas { display: flex; gap: 0.35rem; margin-bottom: 0.9rem; }
+.aba {
+  background: var(--branco);
+  border: 1px solid var(--aco-100);
+  color: var(--aco-500);
+  border-radius: var(--raio);
+  padding: 0.4rem 0.8rem;
+  font-size: 0.83rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.aba.ativa { background: var(--aco-900); color: var(--branco); border-color: var(--aco-900); }
+
+@media (max-width: 1100px) {
+  .grade-4 { grid-template-columns: repeat(2, 1fr); }
+  .grade-3, .grade-2, .grade-larga { grid-template-columns: 1fr; }
+}

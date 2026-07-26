@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Novo pedido — VT Bicicletas</title>
+  <link rel="stylesheet" href="estilo.css">
+  <style>
+    /* Bloco do total: a peça de destaque da tela */
+    .fecho {
+      background: var(--aco-900);
+      color: var(--branco);
+      border-radius: var(--raio);
+      padding: 1rem 1.2rem;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+    .fecho .rotulo {
+      font-family: var(--face-titulo);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-size: 0.82rem;
+      color: var(--aco-300);
+    }
+    .fecho .valor {
+      font-family: var(--face-numero);
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .selo-2k {
+      background: var(--sinal);
+      color: var(--aco-900);
+      font-size: 0.74rem;
+      font-weight: 700;
+      padding: 0.28rem 0.6rem;
+      border-radius: 2px;
+      margin-top: 0.6rem;
+      display: none;
+    }
+    /* Linha do item com "leader" pontilhado, como na tabela de preços impressa */
+    .item-nome { display: flex; align-items: baseline; gap: 0.4rem; }
+    .item-nome .pontos {
+      flex: 1;
+      border-bottom: 1px dotted var(--aco-300);
+      transform: translateY(-3px);
+    }
+    #tabela-itens input.qtd { width: 62px; padding: 0.28rem 0.35rem; }
+
+    .aviso-estoque {
+      display: none;
+      background: #FFF4EC;
+      border: 1px solid #F6C9A6;
+      border-left: 3px solid var(--oxido);
+      border-radius: var(--raio);
+      padding: 0.7rem 0.85rem;
+      font-size: 0.85rem;
+      margin-bottom: 1.1rem;
+    }
+    .aviso-estoque .titulo {
+      font-weight: 700;
+      color: var(--oxido);
+      margin-bottom: 0.3rem;
+    }
+    .aviso-estoque ul { margin: 0.2rem 0 0.4rem; padding-left: 1.1rem; }
+    .aviso-estoque li { margin-bottom: 0.15rem; }
+    .aviso-estoque .obs { color: var(--aco-500); font-size: 0.81rem; }
+  </style>
+</head>
+<body>
+  <script src="menu.js"></script>
+
+  <main class="conteudo">
+    <h1 class="titulo-pagina">Novo pedido</h1>
+    <p class="subtitulo-pagina">Monte o pedido, escolha como o cliente vai pagar e imprima o cupom.</p>
+
+    <div class="cartao">
+      <div class="linha-campos c3">
+        <div class="campo-busca">
+          <label class="campo" for="cliente">Cliente</label>
+          <input type="text" id="cliente" placeholder="Nome do cliente" autocomplete="off">
+          <div class="sugestoes" id="sug-cliente"></div>
+        </div>
+        <div>
+          <label class="campo" for="forma">Forma de pagamento</label>
+          <select id="forma">
+            <option value="prazo">A prazo</option>
+            <option value="vista">À vista</option>
+            <option value="vista_retirada">À vista com retirada em loja</option>
+          </select>
+        </div>
+        <div id="bloco-vencimento">
+          <label class="campo" for="vencimento">Vence em</label>
+          <input type="date" id="vencimento">
+        </div>
+      </div>
+
+      <div class="campo-busca">
+        <label class="campo" for="busca">Adicionar peça ao pedido</label>
+        <input type="text" id="busca" placeholder="Digite o nome da peça — ex: roda livre, pneu 26, quadro aro 29" autocomplete="off">
+        <div class="sugestoes" id="sug-produto"></div>
+      </div>
+    </div>
+
+    <div class="aviso-estoque" id="aviso-estoque"></div>
+
+    <div class="cartao">
+      <table id="tabela-itens">
+        <thead>
+          <tr>
+            <th>Peça</th>
+            <th class="num" style="width: 90px;">Qtd</th>
+            <th class="num" style="width: 110px;">Unitário</th>
+            <th class="num" style="width: 120px;">Subtotal</th>
+            <th style="width: 1%;"></th>
+          </tr>
+        </thead>
+        <tbody id="itens"></tbody>
+      </table>
+    </div>
+
+    <div class="grade-2">
+      <div>
+        <div class="fecho">
+          <span class="rotulo">Total do pedido</span>
+          <span class="valor" id="total">R$ 0,00</span>
+        </div>
+        <div class="selo-2k" id="selo-2k">
+          Preço de retirada aplicado — acima de R$ 2.000,00, entrega grátis
+        </div>
+      </div>
+
+      <div class="acoes" style="align-items: center; height: 100%;">
+        <button class="neutro" id="btn-limpar">Limpar</button>
+        <button class="neutro" id="btn-salvar">Só salvar</button>
+        <button id="btn-imprimir">Salvar e imprimir</button>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let itens = [];              // [{ produto_id, nome, quantidade }]
+    let ultimoCalculo = null;
+    let clienteId = null;        // preenchido quando escolhe um cliente cadastrado
+    let cacheProdutos = null;
+
+    const buscaEl = document.getElementById('busca');
+    const sugProdEl = document.getElementById('sug-produto');
+    const clienteEl = document.getElementById('cliente');
+    const sugCliEl = document.getElementById('sug-cliente');
+    const itensEl = document.getElementById('itens');
+    const totalEl = document.getElementById('total');
+    const seloEl = document.getElementById('selo-2k');
+    const avisoEstoqueEl = document.getElementById('aviso-estoque');
+    const formaEl = document.getElementById('forma');
+    const blocoVencEl = document.getElementById('bloco-vencimento');
+
+    const real = v => (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const escapar = t => String(t ?? '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+
+    // ---------- Busca de peça ----------
+    async function procurarProdutos(termo) {
+      const encontrados = await window.erpAPI.produtos.buscar(termo);
+      if (encontrados && encontrados.length > 0) return encontrados;
+      if (!cacheProdutos) cacheProdutos = await window.erpAPI.produtos.listar();
+      const alvo = termo.toLowerCase();
+      return cacheProdutos.filter(p => p.nome.toLowerCase().includes(alvo));
+    }
+
+    let tProduto;
+    buscaEl.addEventListener('input', (e) => {
+      clearTimeout(tProduto);
+      const termo = e.target.value.trim();
+      if (!termo) { sugProdEl.style.display = 'none'; return; }
+      tProduto = setTimeout(async () => {
+        try {
+          const achados = await procurarProdutos(termo);
+          sugProdEl.innerHTML = achados.length
+            ? achados.slice(0, 25).map(p => `
+                <div class="sugestao" data-id="${p.id}" data-nome="${escapar(p.nome)}">
+                  ${escapar(p.nome)}
+                  <span class="apoio"> ${real(p.preco_vista)}</span>
+                </div>`).join('')
+            : '<div class="sugestao" style="color:var(--aco-500)">Nenhuma peça com esse nome.</div>';
+          sugProdEl.style.display = 'block';
+        } catch (erro) {
+          sugProdEl.innerHTML = `<div class="sugestao" style="color:var(--oxido)">Erro na busca: ${erro.message}</div>`;
+          sugProdEl.style.display = 'block';
+        }
+      }, 180);
+    });
+
+    sugProdEl.addEventListener('click', (e) => {
+      const opcao = e.target.closest('.sugestao[data-id]');
+      if (!opcao) return;
+      adicionarItem(Number(opcao.dataset.id), opcao.dataset.nome);
+      buscaEl.value = '';
+      sugProdEl.style.display = 'none';
+      buscaEl.focus();
+    });
+
+    // ---------- Busca de cliente ----------
+    let tCliente;
+    clienteEl.addEventListener('input', (e) => {
+      clearTimeout(tCliente);
+      clienteId = null; // digitou à mão, então deixa de ser um cliente vinculado
+      const termo = e.target.value.trim();
+      if (termo.length < 2) { sugCliEl.style.display = 'none'; return; }
+      tCliente = setTimeout(async () => {
+        const achados = await window.erpAPI.clientes.buscar(termo);
+        if (achados.length === 0) { sugCliEl.style.display = 'none'; return; }
+        sugCliEl.innerHTML = achados.map(c => `
+          <div class="sugestao" data-id="${c.id}" data-nome="${escapar(c.nome)}">
+            ${escapar(c.nome)}
+            ${c.telefone ? `<span class="apoio"> ${escapar(c.telefone)}</span>` : ''}
+          </div>`).join('');
+        sugCliEl.style.display = 'block';
+      }, 180);
+    });
+
+    sugCliEl.addEventListener('click', (e) => {
+      const opcao = e.target.closest('.sugestao[data-id]');
+      if (!opcao) return;
+      clienteId = Number(opcao.dataset.id);
+      clienteEl.value = opcao.dataset.nome;
+      sugCliEl.style.display = 'none';
+    });
+
+    document.addEventListener('click', (e) => {
+      if (e.target !== buscaEl && !sugProdEl.contains(e.target)) sugProdEl.style.display = 'none';
+      if (e.target !== clienteEl && !sugCliEl.contains(e.target)) sugCliEl.style.display = 'none';
+    });
+
+    // ---------- Itens ----------
+    function adicionarItem(produto_id, nome) {
+      const existente = itens.find(i => i.produto_id === produto_id);
+      if (existente) existente.quantidade += 1;
+      else itens.push({ produto_id, nome, quantidade: 1 });
+      recalcular();
+    }
+
+    function removerItem(produto_id) {
+      itens = itens.filter(i => i.produto_id !== produto_id);
+      recalcular();
+    }
+
+    function alterarQuantidade(produto_id, quantidade) {
+      const item = itens.find(i => i.produto_id === produto_id);
+      if (item) { item.quantidade = Math.max(1, quantidade); recalcular(); }
+    }
+
+    async function recalcular() {
+      if (itens.length === 0) {
+        itensEl.innerHTML = '<tr><td colspan="5" class="vazio">Nenhuma peça ainda. Use o campo acima para adicionar.</td></tr>';
+        totalEl.textContent = real(0);
+        seloEl.style.display = 'none';
+        avisoEstoqueEl.style.display = 'none';
+        ultimoCalculo = null;
+        return;
+      }
+
+      const r = await window.erpAPI.pedidos.calcular(
+        itens.map(({ produto_id, quantidade }) => ({ produto_id, quantidade })),
+        formaEl.value
+      );
+      ultimoCalculo = r;
+
+      itensEl.innerHTML = r.linhas.map(l => `
+        <tr>
+          <td>
+            <div class="item-nome"><span>${escapar(l.nome)}</span><span class="pontos"></span></div>
+            ${l.falta > 0
+              ? `<span class="etiqueta critica" style="margin-top:0.2rem;">Tem ${l.estoque_atual} em estoque</span>`
+              : ''}
+          </td>
+          <td class="num">
+            <input type="number" class="qtd" min="1" value="${l.quantidade}" data-id="${l.produto_id}">
+          </td>
+          <td class="num">${real(l.preco_unitario)}</td>
+          <td class="num" style="font-weight:700;">${real(l.subtotal)}</td>
+          <td><button class="perigo mini" data-remover="${l.produto_id}">Tirar</button></td>
+        </tr>
+      `).join('');
+
+      totalEl.textContent = real(r.total);
+      seloEl.style.display = r.descontoAcimaDe2k ? 'inline-block' : 'none';
+
+      // Aviso de estoque: informa, mas não impede a venda —
+      // a contagem do sistema pode estar atrasada em relação à prateleira.
+      if (r.semEstoque && r.semEstoque.length > 0) {
+        avisoEstoqueEl.innerHTML = `
+          <div class="titulo">Estoque não fecha com o pedido</div>
+          <ul>
+            ${r.semEstoque.map(s => `
+              <li>
+                <strong>${escapar(s.nome)}</strong> —
+                pedido ${s.pedido}, tem ${s.tem} ${s.tem === 1 ? 'peça' : 'peças'}
+                (faltam ${s.falta})
+              </li>`).join('')}
+          </ul>
+          <div class="obs">
+            Dá para vender assim mesmo. Se a peça está na prateleira e não no sistema,
+            corrija a contagem em Estoque depois.
+          </div>`;
+        avisoEstoqueEl.style.display = 'block';
+      } else {
+        avisoEstoqueEl.style.display = 'none';
+      }
+    }
+
+    itensEl.addEventListener('change', (e) => {
+      if (e.target.classList.contains('qtd')) {
+        alterarQuantidade(Number(e.target.dataset.id), Number(e.target.value));
+      }
+    });
+
+    itensEl.addEventListener('click', (e) => {
+      const botao = e.target.closest('button[data-remover]');
+      if (botao) removerItem(Number(botao.dataset.remover));
+    });
+
+    // ---------- Forma de pagamento ----------
+    function atualizarVencimento() {
+      const aPrazo = formaEl.value === 'prazo';
+      blocoVencEl.style.opacity = aPrazo ? '1' : '0.4';
+      document.getElementById('vencimento').disabled = !aPrazo;
+    }
+
+    formaEl.addEventListener('change', () => {
+      atualizarVencimento();
+      recalcular();
+    });
+
+    // ---------- Salvar / imprimir ----------
+    async function salvarPedidoAtual() {
+      if (!ultimoCalculo || itens.length === 0) {
+        alert('Adicione pelo menos uma peça ao pedido.');
+        return null;
+      }
+      return await window.erpAPI.pedidos.salvar({
+        cliente: clienteEl.value.trim(),
+        cliente_id: clienteId,
+        formaPagamento: ultimoCalculo.formaPagamento,
+        linhas: ultimoCalculo.linhas,
+        total: ultimoCalculo.total,
+        vencimento: formaEl.value === 'prazo' ? document.getElementById('vencimento').value : null
+      });
+    }
+
+    function limparTudo() {
+      itens = [];
+      clienteId = null;
+      clienteEl.value = '';
+      document.getElementById('vencimento').value = '';
+      cacheProdutos = null; // estoque mudou, então recarrega na próxima busca
+      recalcular();
+    }
+
+    document.getElementById('btn-limpar').addEventListener('click', limparTudo);
+
+    document.getElementById('btn-salvar').addEventListener('click', async () => {
+      const total = ultimoCalculo?.total;
+      const id = await salvarPedidoAtual();
+      if (!id) return;
+      alert(`Pedido #${id} salvo. Total ${real(total)}.`);
+      limparTudo();
+    });
+
+    document.getElementById('btn-imprimir').addEventListener('click', async () => {
+      const id = await salvarPedidoAtual();
+      if (!id) return;
+      try {
+        await window.erpAPI.impressao.imprimir(id, { silencioso: false });
+      } catch (erro) {
+        alert(`Pedido #${id} foi salvo, mas a impressão falhou:\n${erro.message}`);
+      }
+      limparTudo();
+    });
+
+    atualizarVencimento();
+    recalcular();
+    buscaEl.focus();
+  </script>
+</body>
+</html>
