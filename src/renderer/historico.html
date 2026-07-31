@@ -139,25 +139,44 @@
           ? '<div style="text-align:right; margin-top:0.3rem;"><span class="etiqueta atencao">Preço de retirada aplicado</span></div>'
           : ''}
 
+        <div id="area-cancelamento" style="display:none; margin-top:1.1rem; padding:0.9rem;
+             background:var(--papel); border:1px solid var(--aco-100); border-radius:var(--raio);">
+          <label class="campo" for="motivo">Motivo do cancelamento (opcional)</label>
+          <input type="text" id="motivo" placeholder="Ex: cliente desistiu">
+          <div style="font-size:0.8rem; color:var(--aco-500); margin:0.5rem 0 0.7rem;">
+            As peças voltam ao estoque e as parcelas em aberto são retiradas.
+            O pedido continua no histórico, marcado como cancelado.
+          </div>
+          <div class="acoes">
+            <button class="neutro mini" id="btn-cancelar-nao">Voltar</button>
+            <button class="mini" id="btn-cancelar-sim">Confirmar cancelamento</button>
+          </div>
+        </div>
+
         <div class="acoes" style="margin-top: 1.1rem;">
-          ${pedido.cancelado ? '' : '<button class="perigo mini" id="btn-cancelar">Cancelar pedido</button>'}
+          <button class="perigo mini" id="btn-excluir">Excluir</button>
+          ${pedido.cancelado ? '' : '<button class="neutro mini" id="btn-cancelar">Cancelar pedido</button>'}
           <button id="btn-imprimir">Imprimir cupom</button>
         </div>
       `;
 
+      const areaCancelamento = document.getElementById('area-cancelamento');
       const botaoCancelar = document.getElementById('btn-cancelar');
-      if (botaoCancelar) {
-        botaoCancelar.addEventListener('click', async () => {
-          const motivo = prompt(
-            `Cancelar o pedido #${pedido.id}?\n\n` +
-            'As peças voltam ao estoque e a cobrança a prazo é retirada.\n' +
-            'O pedido continua no histórico, marcado como cancelado.\n\n' +
-            'Motivo (opcional):'
-          );
-          if (motivo === null) return; // desistiu
 
+      if (botaoCancelar) {
+        botaoCancelar.addEventListener('click', () => {
+          areaCancelamento.style.display = 'block';
+          document.getElementById('motivo').focus();
+        });
+
+        document.getElementById('btn-cancelar-nao').addEventListener('click', () => {
+          areaCancelamento.style.display = 'none';
+        });
+
+        document.getElementById('btn-cancelar-sim').addEventListener('click', async () => {
+          const motivo = document.getElementById('motivo').value.trim();
           try {
-            const r = await window.erpAPI.pedidos.cancelar(pedido.id, motivo.trim());
+            const r = await window.erpAPI.pedidos.cancelar(pedido.id, motivo);
             await carregarLista();
             mostrarDetalhe(await window.erpAPI.pedidos.buscar(pedido.id));
             let aviso = `Pedido #${r.pedido_id} cancelado. ${r.itensDevolvidos} ${r.itensDevolvidos === 1 ? 'item voltou' : 'itens voltaram'} ao estoque.`;
@@ -168,6 +187,24 @@
           }
         });
       }
+
+      document.getElementById('btn-excluir').addEventListener('click', async () => {
+        const aviso =
+          `Apagar o pedido #${pedido.id} de vez?\n\n` +
+          'Ele some do histórico e dos relatórios, como se nunca tivesse existido.\n' +
+          (pedido.cancelado ? '' : 'As peças voltam ao estoque e as cobranças são retiradas.\n') +
+          '\nUse isso para limpar registros de teste. Não tem como desfazer.';
+        if (!confirm(aviso)) return;
+
+        try {
+          const r = await window.erpAPI.pedidos.excluir(pedido.id);
+          selecionado = null;
+          await carregarLista();
+          detalheEl.innerHTML = `<p class="vazio">Pedido #${r.pedido_id} apagado.</p>`;
+        } catch (erro) {
+          alert(`Não deu para apagar: ${erro.message}`);
+        }
+      });
 
       document.getElementById('btn-imprimir').addEventListener('click', async (ev) => {
         const botao = ev.target;

@@ -82,6 +82,8 @@ ipcMain.handle('pedidos:buscar', (event, id) => pedidos.buscarPedido(id));
 
 ipcMain.handle('pedidos:cancelar', (e, id, motivo) => pedidos.cancelarPedido(id, motivo));
 
+ipcMain.handle('pedidos:excluir', (e, id) => pedidos.excluirPedido(id));
+
 ipcMain.handle('impressao:imprimir', (event, pedidoId, opcoes) => {
   const pedido = pedidos.buscarPedido(pedidoId);
   if (!pedido) throw new Error(`Pedido #${pedidoId} não encontrado`);

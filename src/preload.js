@@ -36,7 +36,8 @@ contextBridge.exposeInMainWorld('erpAPI', {
     salvar: (dados) => ipcRenderer.invoke('pedidos:salvar', dados),
     listar: () => ipcRenderer.invoke('pedidos:listar'),
     buscar: (id) => ipcRenderer.invoke('pedidos:buscar', id),
-    cancelar: (id, motivo) => ipcRenderer.invoke('pedidos:cancelar', id, motivo)
+    cancelar: (id, motivo) => ipcRenderer.invoke('pedidos:cancelar', id, motivo),
+    excluir: (id) => ipcRenderer.invoke('pedidos:excluir', id)
   },
 
   impressao: {

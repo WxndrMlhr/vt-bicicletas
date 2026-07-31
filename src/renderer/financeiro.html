@@ -117,7 +117,12 @@
       listaEl.innerHTML = contas.map(c => `
         <tr data-id="${c.id}">
           <td>${escapar(c.cliente_nome) || '<span style="color:var(--aco-500)">Sem cliente</span>'}</td>
-          <td>${c.pedido_id ? '#' + c.pedido_id : '—'}</td>
+          <td>
+            ${c.pedido_id ? '#' + c.pedido_id : '—'}
+            ${c.total_parcelas > 1
+              ? `<span class="etiqueta neutra" style="margin-left:0.25rem;">${c.parcela}/${c.total_parcelas}</span>`
+              : ''}
+          </td>
           <td>
             <input type="date" class="venc" data-id="${c.id}"
                    value="${c.vencimento ? c.vencimento.slice(0, 10) : ''}"

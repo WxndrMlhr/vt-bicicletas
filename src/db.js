@@ -203,6 +203,8 @@ garantirColuna('pedidos', 'cancelado', 'INTEGER NOT NULL DEFAULT 0');
 garantirColuna('pedidos', 'cancelado_em', 'TEXT');
 garantirColuna('pedidos', 'motivo_cancelamento', 'TEXT');
 garantirColuna('pedidos', 'meio_pagamento', 'TEXT');
+garantirColuna('contas_receber', 'parcela', 'INTEGER');
+garantirColuna('contas_receber', 'total_parcelas', 'INTEGER');
 
 // Carrega automaticamente a tabela de preços da VT Bicicletas.
 // Só insere os itens que ainda não existem (compara pelo nome),

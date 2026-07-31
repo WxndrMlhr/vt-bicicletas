@@ -83,7 +83,7 @@ function calcularPedido(itens, formaPagamento) {
 
 // Salva o pedido calculado no banco e devolve o id gerado.
 // Junto disso: dá baixa no estoque e, se for a prazo, abre a conta a receber.
-function salvarPedido({ cliente, cliente_id, formaPagamento, linhas, total, vencimento, meioPagamento }) {
+function salvarPedido({ cliente, cliente_id, formaPagamento, linhas, total, vencimento, meioPagamento, parcelas }) {
   const estoque = require('./estoque');
   const financeiro = require('./financeiro');
 
@@ -116,12 +116,22 @@ function salvarPedido({ cliente, cliente_id, formaPagamento, linhas, total, venc
     estoque.baixarPedido(pedido_id, linhas);
 
     if (formaPagamento === 'prazo') {
-      financeiro.criarConta({
-        pedido_id,
-        cliente_id: cliente_id || null,
-        cliente_nome: cliente || null,
-        valor: total,
-        vencimento: vencimento || null
+      // parcelas = [{ vencimento, valor }] — uma cobrança por parcela.
+      // Sem parcelas informadas, cria uma cobrança única com o total.
+      const lista = (parcelas && parcelas.length > 0)
+        ? parcelas
+        : [{ vencimento: vencimento || null, valor: total }];
+
+      lista.forEach((parcela, i) => {
+        financeiro.criarConta({
+          pedido_id,
+          cliente_id: cliente_id || null,
+          cliente_nome: cliente || null,
+          valor: parcela.valor,
+          vencimento: parcela.vencimento || null,
+          parcela: i + 1,
+          total_parcelas: lista.length
+        });
       });
     }
 
@@ -157,15 +167,23 @@ function cancelarPedido(id, motivo) {
       });
     }
 
-    // Remove a cobrança, se ainda não foi paga
-    const conta = db.prepare('SELECT * FROM contas_receber WHERE pedido_id = ?').get(id);
+    // Remove as cobranças que ainda não foram pagas.
+    // Parcela já paga não some sozinha — o dinheiro entrou de verdade,
+    // então o acerto da devolução é uma decisão da loja.
+    const contas = db.prepare('SELECT * FROM contas_receber WHERE pedido_id = ?').all(id);
+    const pagas = contas.filter(c => c.pago);
+    const emAberto = contas.filter(c => !c.pago);
+
+    if (emAberto.length > 0) {
+      db.prepare('DELETE FROM contas_receber WHERE pedido_id = ? AND pago = 0').run(id);
+    }
+
     let avisoConta = null;
-    if (conta) {
-      if (conta.pago) {
-        avisoConta = 'A conta desse pedido já estava paga. Confira o financeiro para acertar a devolução.';
-      } else {
-        db.prepare('DELETE FROM contas_receber WHERE pedido_id = ?').run(id);
-      }
+    if (pagas.length > 0) {
+      const valorPago = pagas.reduce((soma, c) => soma + c.valor, 0);
+      avisoConta = pagas.length === 1
+        ? `Uma parcela desse pedido já estava paga (R$ ${valorPago.toFixed(2)}). Confira o financeiro para acertar a devolução.`
+        : `${pagas.length} parcelas desse pedido já estavam pagas (R$ ${valorPago.toFixed(2)} no total). Confira o financeiro para acertar a devolução.`;
     }
 
     db.prepare(`
@@ -182,6 +200,43 @@ function cancelarPedido(id, motivo) {
   return transacao();
 }
 
+// Apaga o pedido de vez: some do histórico e dos relatórios.
+// Serve para limpar registros de teste. Antes de apagar, devolve as peças
+// ao estoque (se o pedido ainda não estava cancelado) e remove as cobranças.
+function excluirPedido(id) {
+  const estoque = require('./estoque');
+
+  const transacao = db.transaction(() => {
+    const pedido = db.prepare('SELECT * FROM pedidos WHERE id = ?').get(id);
+    if (!pedido) throw new Error(`Pedido #${id} não encontrado.`);
+
+    const itens = db.prepare('SELECT * FROM pedido_itens WHERE pedido_id = ?').all(id);
+
+    // Pedido cancelado já devolveu as peças; devolver de novo duplicaria o estoque.
+    if (!pedido.cancelado) {
+      for (const item of itens) {
+        if (!item.produto_id) continue;
+        estoque.registrarMovimentacao({
+          produto_id: item.produto_id,
+          tipo: 'entrada',
+          quantidade: item.quantidade,
+          motivo: `Exclusão do pedido #${id}`,
+          pedido_id: null
+        });
+      }
+    }
+
+    db.prepare('DELETE FROM contas_receber WHERE pedido_id = ?').run(id);
+    db.prepare('UPDATE movimentacoes_estoque SET pedido_id = NULL WHERE pedido_id = ?').run(id);
+    db.prepare('DELETE FROM pedido_itens WHERE pedido_id = ?').run(id);
+    db.prepare('DELETE FROM pedidos WHERE id = ?').run(id);
+
+    return { pedido_id: id, itensDevolvidos: pedido.cancelado ? 0 : itens.length };
+  });
+
+  return transacao();
+}
+
 function listarPedidos() {
   return db.prepare('SELECT * FROM pedidos ORDER BY id DESC LIMIT 100').all();
 }
@@ -190,6 +245,16 @@ function buscarPedido(id) {
   const pedido = db.prepare('SELECT * FROM pedidos WHERE id = ?').get(id);
   if (!pedido) return null;
   pedido.itens = db.prepare('SELECT * FROM pedido_itens WHERE pedido_id = ?').all(id);
+
+  // Traz as cobranças do pedido, para o cupom mostrar as datas de pagamento.
+  pedido.parcelas = db.prepare(`
+    SELECT parcela, total_parcelas, valor, vencimento, pago
+    FROM contas_receber
+    WHERE pedido_id = ?
+    ORDER BY (vencimento IS NULL), vencimento, parcela
+  `).all(id);
+  pedido.vencimento = pedido.parcelas.length ? pedido.parcelas[0].vencimento : null;
+
   return pedido;
 }
 
@@ -197,6 +262,7 @@ module.exports = {
   calcularPedido,
   salvarPedido,
   cancelarPedido,
+  excluirPedido,
   listarPedidos,
   buscarPedido
 };

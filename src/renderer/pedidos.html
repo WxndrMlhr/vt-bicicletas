@@ -47,6 +47,14 @@
     }
     #tabela-itens input.qtd { width: 62px; padding: 0.28rem 0.35rem; }
 
+    .atalhos-prazo { display: flex; gap: 0.3rem; margin-top: 0.35rem; }
+    .atalhos-prazo button { flex: 1; padding: 0.28rem 0.2rem; font-size: 0.75rem; }
+    .atalhos-prazo button.escolhido {
+      background: var(--aco-900);
+      color: var(--branco);
+      border-color: var(--aco-900);
+    }
+
     .aviso-estoque {
       display: none;
       background: #FFF4EC;
@@ -84,15 +92,19 @@
         <div>
           <label class="campo" for="forma">Forma de pagamento</label>
           <select id="forma">
-            <option value="balcao">Balcão (varejo)</option>
-            <option value="prazo">Atacado — a prazo</option>
-            <option value="vista">Atacado — à vista</option>
-            <option value="vista_retirada">Atacado — à vista com retirada</option>
+            <option value="prazo">A prazo</option>
+            <option value="vista">À vista</option>
+            <option value="vista_retirada">À vista com retirada em loja</option>
           </select>
         </div>
         <div id="bloco-vencimento">
-          <label class="campo" for="vencimento">Vence em</label>
-          <input type="date" id="vencimento">
+          <label class="campo" for="qtd-parcelas">Parcelas</label>
+          <input type="number" id="qtd-parcelas" min="1" max="24" value="1">
+          <div class="atalhos-prazo">
+            <button type="button" class="neutro mini" data-intervalo="7">Semanal</button>
+            <button type="button" class="neutro mini" data-intervalo="15">Quinzenal</button>
+            <button type="button" class="neutro mini" data-intervalo="30">Mensal</button>
+          </div>
         </div>
       </div>
 
@@ -104,6 +116,23 @@
     </div>
 
     <div class="aviso-estoque" id="aviso-balcao"></div>
+    <div class="cartao" id="painel-parcelas" style="display:none;">
+      <h2 class="secao">Parcelas</h2>
+      <table id="tabela-parcelas">
+        <thead>
+          <tr>
+            <th style="width: 90px;">Parcela</th>
+            <th style="width: 170px;">Vence em</th>
+            <th class="num">Valor</th>
+          </tr>
+        </thead>
+        <tbody id="linhas-parcelas"></tbody>
+      </table>
+      <div style="font-size:0.8rem; color:var(--aco-500); margin-top:0.5rem;">
+        As datas podem ser alteradas uma a uma. O valor é dividido igualmente.
+      </div>
+    </div>
+
     <div class="aviso-estoque" id="aviso-estoque"></div>
 
     <div class="cartao">
@@ -289,6 +318,9 @@
       totalEl.textContent = real(r.total);
       seloEl.style.display = r.descontoAcimaDe2k ? 'inline-block' : 'none';
 
+      // O total mudou, então os valores das parcelas mudam junto — mas as datas ficam.
+      if (formaEl.value === 'prazo') gerarParcelas({ manterDatas: true });
+
       // Aviso de peças sem preço de balcão cadastrado
       if (r.semPrecoBalcao && r.semPrecoBalcao.length > 0) {
         avisoBalcaoEl.innerHTML = `
@@ -338,10 +370,89 @@
     });
 
     // ---------- Forma de pagamento ----------
+    // ---------- Parcelamento ----------
+    // parcelas = [{ vencimento, valor }] — as datas ficam editáveis uma a uma.
+    let parcelas = [];
+    let intervaloEscolhido = 30;
+
+    const painelParcelasEl = document.getElementById('painel-parcelas');
+    const linhasParcelasEl = document.getElementById('linhas-parcelas');
+    const qtdParcelasEl = document.getElementById('qtd-parcelas');
+
+    function dataISO(d) {
+      const p = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+    }
+
+    // Divide o total em centavos exatos; a sobra vai para a última parcela.
+    function dividirValor(total, quantidade) {
+      const base = Math.floor((total * 100) / quantidade) / 100;
+      const valores = Array(quantidade).fill(base);
+      valores[quantidade - 1] = +(base + (total - +(base * quantidade).toFixed(2))).toFixed(2);
+      return valores;
+    }
+
+    function gerarParcelas({ manterDatas = false } = {}) {
+      const quantidade = Math.max(1, Math.min(24, Number(qtdParcelasEl.value) || 1));
+      const total = ultimoCalculo ? ultimoCalculo.total : 0;
+      const valores = dividirValor(total, quantidade);
+
+      const datasAnteriores = parcelas.map(p => p.vencimento);
+      parcelas = valores.map((valor, i) => {
+        let vencimento;
+        if (manterDatas && datasAnteriores[i]) {
+          vencimento = datasAnteriores[i];
+        } else {
+          const d = new Date();
+          d.setDate(d.getDate() + intervaloEscolhido * (i + 1));
+          vencimento = dataISO(d);
+        }
+        return { vencimento, valor };
+      });
+
+      desenharParcelas();
+    }
+
+    function desenharParcelas() {
+      const aPrazo = formaEl.value === 'prazo';
+      painelParcelasEl.style.display = aPrazo ? 'block' : 'none';
+      if (!aPrazo) return;
+
+      linhasParcelasEl.innerHTML = parcelas.map((p, i) => `
+        <tr>
+          <td>${i + 1} de ${parcelas.length}</td>
+          <td>
+            <input type="date" class="venc-parcela" data-i="${i}" value="${p.vencimento || ''}"
+                   style="padding:0.3rem 0.4rem; font-size:0.85rem;">
+          </td>
+          <td class="num" style="font-weight:700;">${real(p.valor)}</td>
+        </tr>
+      `).join('');
+    }
+
+    linhasParcelasEl.addEventListener('change', (e) => {
+      if (!e.target.classList.contains('venc-parcela')) return;
+      parcelas[Number(e.target.dataset.i)].vencimento = e.target.value;
+    });
+
+    qtdParcelasEl.addEventListener('input', () => gerarParcelas());
+
+    document.querySelectorAll('.atalhos-prazo button').forEach(botao => {
+      botao.addEventListener('click', () => {
+        intervaloEscolhido = Number(botao.dataset.intervalo);
+        document.querySelectorAll('.atalhos-prazo button').forEach(b => b.classList.remove('escolhido'));
+        botao.classList.add('escolhido');
+        gerarParcelas();
+      });
+    });
+
     function atualizarVencimento() {
       const aPrazo = formaEl.value === 'prazo';
       blocoVencEl.style.opacity = aPrazo ? '1' : '0.4';
-      document.getElementById('vencimento').disabled = !aPrazo;
+      qtdParcelasEl.disabled = !aPrazo;
+      document.querySelectorAll('.atalhos-prazo button').forEach(b => { b.disabled = !aPrazo; });
+      if (aPrazo) gerarParcelas({ manterDatas: true });
+      else painelParcelasEl.style.display = 'none';
     }
 
     formaEl.addEventListener('change', () => {
@@ -361,7 +472,7 @@
         formaPagamento: ultimoCalculo.formaPagamento,
         linhas: ultimoCalculo.linhas,
         total: ultimoCalculo.total,
-        vencimento: formaEl.value === 'prazo' ? document.getElementById('vencimento').value : null
+        parcelas: formaEl.value === 'prazo' ? parcelas : null
       });
     }
 
@@ -369,7 +480,8 @@
       itens = [];
       clienteId = null;
       clienteEl.value = '';
-      document.getElementById('vencimento').value = '';
+      qtdParcelasEl.value = 1;
+      parcelas = [];
       cacheProdutos = null; // estoque mudou, então recarrega na próxima busca
       recalcular();
     }

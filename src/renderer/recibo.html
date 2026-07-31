@@ -86,6 +86,7 @@
   <hr>
 
   <div id="cabecalho"></div>
+  <div id="parcelas"></div>
 
   <hr>
 
@@ -131,6 +132,23 @@
         ${pedido.cliente ? `<div><span class="negrito">Cliente:</span> ${pedido.cliente}</div>` : ''}
         <div><span class="negrito">Pagamento:</span> ${nomesForma[pedido.forma_pagamento] || pedido.forma_pagamento}</div>
       `;
+
+      // Parcelas do pedido a prazo, com data e valor de cada uma
+      const parcelas = pedido.parcelas || [];
+      if (parcelas.length > 0) {
+        const dia = v => v ? v.slice(0, 10).split('-').reverse().join('/') : 'a combinar';
+        document.getElementById('parcelas').innerHTML = `
+          <div style="border-top:1px dashed #333; margin:7px 0;"></div>
+          <div class="negrito" style="margin-bottom:2px;">
+            ${parcelas.length === 1 ? 'Pagamento' : 'Pagamento em ' + parcelas.length + 'x'}
+          </div>
+          ${parcelas.map(p => `
+            <div style="display:flex; justify-content:space-between;">
+              <span>${p.total_parcelas > 1 ? p.parcela + '/' + p.total_parcelas + ' - ' : ''}${dia(p.vencimento)}</span>
+              <span>${formatarReal(p.valor)}</span>
+            </div>`).join('')}
+        `;
+      }
 
       document.getElementById('itens').innerHTML = pedido.itens.map(i => `
         <tr>

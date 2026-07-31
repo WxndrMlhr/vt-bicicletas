@@ -1,11 +1,26 @@
 const db = require('./db');
 
-function criarConta({ pedido_id, cliente_id, cliente_nome, valor, vencimento }) {
+function criarConta({ pedido_id, cliente_id, cliente_nome, valor, vencimento, parcela, total_parcelas }) {
   const info = db.prepare(`
-    INSERT INTO contas_receber (pedido_id, cliente_id, cliente_nome, valor, vencimento)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(pedido_id || null, cliente_id || null, cliente_nome || null, valor, vencimento || null);
+    INSERT INTO contas_receber
+      (pedido_id, cliente_id, cliente_nome, valor, vencimento, parcela, total_parcelas)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    pedido_id || null, cliente_id || null, cliente_nome || null,
+    valor, vencimento || null, parcela || null, total_parcelas || null
+  );
   return info.lastInsertRowid;
+}
+
+// Divide um total em N parcelas de centavos exatos.
+// A diferença do arredondamento vai para a última parcela,
+// para a soma das parcelas bater com o total do pedido.
+function dividirEmParcelas(total, quantidade) {
+  const base = Math.floor((total * 100) / quantidade) / 100;
+  const valores = Array(quantidade).fill(base);
+  const somaBase = +(base * quantidade).toFixed(2);
+  valores[quantidade - 1] = +(base + (total - somaBase)).toFixed(2);
+  return valores;
 }
 
 // situacao: 'abertas' | 'pagas' | 'vencidas' | 'todas'
@@ -88,6 +103,7 @@ function resumoFinanceiro() {
 
 module.exports = {
   criarConta,
+  dividirEmParcelas,
   listarContas,
   darBaixa,
   reabrirConta,
