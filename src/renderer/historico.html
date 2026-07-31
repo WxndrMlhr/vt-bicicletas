@@ -41,7 +41,7 @@
   </main>
 
   <script>
-    const nomesForma = { prazo: 'A prazo', vista: 'À vista', vista_retirada: 'À vista c/ retirada' };
+    const nomesForma = { balcao: 'Balcão', prazo: 'A prazo', vista: 'À vista', vista_retirada: 'À vista c/ retirada' };
 
     const listaEl = document.getElementById('lista');
     const detalheEl = document.getElementById('detalhe');
@@ -58,7 +58,7 @@
     }
 
     function etiquetaForma(forma) {
-      const classe = forma === 'prazo' ? 'atencao' : 'ok';
+      const classe = forma === 'prazo' ? 'atencao' : (forma === 'balcao' ? 'neutra' : 'ok');
       return `<span class="etiqueta ${classe}">${nomesForma[forma] || forma}</span>`;
     }
 
@@ -109,7 +109,10 @@
         <div style="color: var(--aco-500); font-size: 0.85rem; margin-bottom: 1rem;">
           ${formatarData(pedido.criado_em)} ·
           ${escapar(pedido.cliente) || 'sem cliente'} ·
-          ${nomesForma[pedido.forma_pagamento] || pedido.forma_pagamento}
+          ${nomesForma[pedido.forma_pagamento] || pedido.forma_pagamento}${
+            pedido.meio_pagamento
+              ? ' (' + (pedido.meio_pagamento === 'cartao' ? 'cartão' : 'dinheiro/pix') + ')'
+              : ''}
         </div>
 
         <table>
@@ -132,7 +135,7 @@
           <span class="dinheiro" style="font-size:1.4rem; font-weight:700;">${real(pedido.total)}</span>
         </div>
 
-        ${pedido.total >= 2000
+        ${pedido.total >= 2000 && pedido.forma_pagamento === 'vista'
           ? '<div style="text-align:right; margin-top:0.3rem;"><span class="etiqueta atencao">Preço de retirada aplicado</span></div>'
           : ''}
 

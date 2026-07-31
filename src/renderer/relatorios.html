@@ -77,7 +77,7 @@
   </main>
 
   <script>
-    const nomesForma = { prazo: 'A prazo', vista: 'À vista', vista_retirada: 'À vista c/ retirada' };
+    const nomesForma = { balcao: 'Balcão', prazo: 'A prazo', vista: 'À vista', vista_retirada: 'À vista c/ retirada' };
 
     const real = v => (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     const escapar = t => String(t ?? '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));

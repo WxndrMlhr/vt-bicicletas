@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Balcão — VT Bicicletas</title>
+  <link rel="stylesheet" href="estilo.css">
+  <style>
+    /* Tela de atendimento: campos maiores, menos coisa na frente,
+       pensada para vender rápido com o cliente esperando. */
+    .busca-grande input {
+      font-size: 1.15rem;
+      padding: 0.85rem 0.9rem;
+    }
+    .busca-grande .sugestao {
+      padding: 0.6rem 0.75rem;
+      font-size: 0.95rem;
+    }
+
+    #tabela-venda td { padding: 0.6rem; font-size: 0.95rem; }
+    #tabela-venda input.qtd {
+      width: 74px;
+      padding: 0.4rem 0.45rem;
+      font-size: 1rem;
+    }
+
+    .fecho {
+      background: var(--aco-900);
+      color: var(--branco);
+      border-radius: var(--raio);
+      padding: 1.2rem 1.4rem;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+    .fecho .rotulo {
+      font-family: var(--face-titulo);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-size: 0.85rem;
+      color: var(--aco-300);
+    }
+    .fecho .valor {
+      font-family: var(--face-numero);
+      font-size: 2.4rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .meio-pagamento { display: flex; gap: 0.5rem; }
+    .meio-pagamento button {
+      flex: 1;
+      padding: 0.7rem;
+      font-size: 0.95rem;
+      background: var(--branco);
+      border: 1px solid var(--aco-100);
+      color: var(--aco-700);
+    }
+    .meio-pagamento button.escolhido {
+      background: var(--aco-900);
+      color: var(--branco);
+      border-color: var(--aco-900);
+    }
+
+    .botao-finalizar { width: 100%; padding: 0.95rem; font-size: 1.05rem; }
+
+    .aviso {
+      display: none;
+      background: #FFF4EC;
+      border: 1px solid #F6C9A6;
+      border-left: 3px solid var(--oxido);
+      border-radius: var(--raio);
+      padding: 0.7rem 0.85rem;
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+    }
+    .aviso .titulo { font-weight: 700; color: var(--oxido); margin-bottom: 0.25rem; }
+    .aviso ul { margin: 0.2rem 0 0; padding-left: 1.1rem; }
+
+    .atalho-dica {
+      font-size: 0.78rem;
+      color: var(--aco-500);
+      margin-top: 0.4rem;
+    }
+  </style>
+</head>
+<body>
+  <script src="menu.js"></script>
+
+  <main class="conteudo">
+    <h1 class="titulo-pagina">Balcão</h1>
+    <p class="subtitulo-pagina">Venda de varejo, preço de balcão. Sem prazo, sem regra de R$ 2.000.</p>
+
+    <div class="cartao busca-grande">
+      <div class="campo-busca">
+        <label class="campo" for="busca">Peça</label>
+        <input type="text" id="busca" placeholder="Digite o nome da peça e aperte Enter" autocomplete="off">
+        <div class="sugestoes" id="sugestoes"></div>
+      </div>
+      <div class="atalho-dica">
+        Enter adiciona a primeira peça da lista. Setas ↑ ↓ escolhem outra.
+      </div>
+    </div>
+
+    <div class="aviso" id="aviso-balcao"></div>
+    <div class="aviso" id="aviso-estoque"></div>
+
+    <div class="grade-larga">
+      <div class="cartao">
+        <table id="tabela-venda">
+          <thead>
+            <tr>
+              <th>Peça</th>
+              <th class="num" style="width: 100px;">Qtd</th>
+              <th class="num" style="width: 110px;">Unitário</th>
+              <th class="num" style="width: 120px;">Subtotal</th>
+              <th style="width: 1%;"></th>
+            </tr>
+          </thead>
+          <tbody id="itens"></tbody>
+        </table>
+      </div>
+
+      <div>
+        <div class="fecho" style="margin-bottom: 1.1rem;">
+          <span class="rotulo">Total</span>
+          <span class="valor" id="total">R$ 0,00</span>
+        </div>
+
+        <div class="cartao">
+          <h2 class="secao">Como pagou</h2>
+          <div class="meio-pagamento" style="margin-bottom: 1rem;">
+            <button class="escolhido" data-meio="dinheiro">Dinheiro / Pix</button>
+            <button data-meio="cartao">Cartão</button>
+          </div>
+
+          <label class="campo" for="cliente">Cliente (opcional)</label>
+          <input type="text" id="cliente" placeholder="Só se quiser registrar" style="margin-bottom: 1rem;">
+
+          <button class="botao-finalizar" id="btn-finalizar">Finalizar e imprimir</button>
+          <div style="display: flex; gap: 0.5rem; margin-top: 0.6rem;">
+            <button class="neutro" id="btn-so-salvar" style="flex: 1;">Sem imprimir</button>
+            <button class="neutro" id="btn-limpar" style="flex: 1;">Limpar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let itens = [];
+    let ultimoCalculo = null;
+    let meioPagamento = 'dinheiro';
+    let cacheProdutos = null;
+    let indiceSugestao = -1;
+
+    const buscaEl = document.getElementById('busca');
+    const sugEl = document.getElementById('sugestoes');
+    const itensEl = document.getElementById('itens');
+    const totalEl = document.getElementById('total');
+    const avisoBalcaoEl = document.getElementById('aviso-balcao');
+    const avisoEstoqueEl = document.getElementById('aviso-estoque');
+
+    const real = v => (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const escapar = t => String(t ?? '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+
+    // ---------- Busca ----------
+    async function procurar(termo) {
+      const achados = await window.erpAPI.produtos.buscar(termo);
+      if (achados && achados.length > 0) return achados;
+      if (!cacheProdutos) cacheProdutos = await window.erpAPI.produtos.listar();
+      const alvo = termo.toLowerCase();
+      return cacheProdutos.filter(p => p.nome.toLowerCase().includes(alvo));
+    }
+
+    function marcarSugestao(i) {
+      const opcoes = sugEl.querySelectorAll('.sugestao[data-id]');
+      if (opcoes.length === 0) return;
+      indiceSugestao = Math.max(0, Math.min(i, opcoes.length - 1));
+      opcoes.forEach((o, n) => {
+        o.style.background = n === indiceSugestao ? '#F0F3F6' : '';
+      });
+      opcoes[indiceSugestao].scrollIntoView({ block: 'nearest' });
+    }
+
+    let t;
+    buscaEl.addEventListener('input', (e) => {
+      clearTimeout(t);
+      const termo = e.target.value.trim();
+      if (!termo) { sugEl.style.display = 'none'; indiceSugestao = -1; return; }
+      t = setTimeout(async () => {
+        const achados = await procurar(termo);
+        sugEl.innerHTML = achados.length
+          ? achados.slice(0, 25).map(p => `
+              <div class="sugestao" data-id="${p.id}" data-nome="${escapar(p.nome)}">
+                ${escapar(p.nome)}
+                <span class="apoio"> ${p.preco_balcao != null ? real(p.preco_balcao) : real(p.preco_vista) + ' (sem balcão)'}</span>
+              </div>`).join('')
+          : '<div class="sugestao" style="color:var(--aco-500)">Nenhuma peça com esse nome.</div>';
+        sugEl.style.display = 'block';
+        marcarSugestao(0);
+      }, 160);
+    });
+
+    buscaEl.addEventListener('keydown', (e) => {
+      const opcoes = sugEl.querySelectorAll('.sugestao[data-id]');
+      if (e.key === 'ArrowDown') { e.preventDefault(); marcarSugestao(indiceSugestao + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); marcarSugestao(indiceSugestao - 1); }
+      else if (e.key === 'Enter') {
+        e.preventDefault();
+        const escolhida = opcoes[indiceSugestao];
+        if (escolhida) {
+          adicionar(Number(escolhida.dataset.id), escolhida.dataset.nome);
+          buscaEl.value = '';
+          sugEl.style.display = 'none';
+          indiceSugestao = -1;
+        }
+      } else if (e.key === 'Escape') {
+        sugEl.style.display = 'none';
+      }
+    });
+
+    sugEl.addEventListener('click', (e) => {
+      const opcao = e.target.closest('.sugestao[data-id]');
+      if (!opcao) return;
+      adicionar(Number(opcao.dataset.id), opcao.dataset.nome);
+      buscaEl.value = '';
+      sugEl.style.display = 'none';
+      buscaEl.focus();
+    });
+
+    document.addEventListener('click', (e) => {
+      if (e.target !== buscaEl && !sugEl.contains(e.target)) sugEl.style.display = 'none';
+    });
+
+    // ---------- Itens ----------
+    function adicionar(produto_id, nome) {
+      const existente = itens.find(i => i.produto_id === produto_id);
+      if (existente) existente.quantidade += 1;
+      else itens.push({ produto_id, nome, quantidade: 1 });
+      recalcular();
+    }
+
+    function remover(produto_id) {
+      itens = itens.filter(i => i.produto_id !== produto_id);
+      recalcular();
+    }
+
+    async function recalcular() {
+      if (itens.length === 0) {
+        itensEl.innerHTML = '<tr><td colspan="5" class="vazio">Comece digitando o nome da peça acima.</td></tr>';
+        totalEl.textContent = real(0);
+        avisoBalcaoEl.style.display = 'none';
+        avisoEstoqueEl.style.display = 'none';
+        ultimoCalculo = null;
+        return;
+      }
+
+      const r = await window.erpAPI.pedidos.calcular(
+        itens.map(({ produto_id, quantidade }) => ({ produto_id, quantidade })),
+        'balcao'
+      );
+      ultimoCalculo = r;
+
+      itensEl.innerHTML = r.linhas.map(l => `
+        <tr>
+          <td>
+            ${escapar(l.nome)}
+            ${l.sem_preco_balcao ? '<br><span class="etiqueta atencao">Sem preço de balcão — usando o à vista</span>' : ''}
+            ${l.falta > 0 ? `<br><span class="etiqueta critica">Tem ${l.estoque_atual} em estoque</span>` : ''}
+          </td>
+          <td class="num"><input type="number" class="qtd" min="1" value="${l.quantidade}" data-id="${l.produto_id}"></td>
+          <td class="num">${real(l.preco_unitario)}</td>
+          <td class="num" style="font-weight:700;">${real(l.subtotal)}</td>
+          <td><button class="perigo mini" data-remover="${l.produto_id}">Tirar</button></td>
+        </tr>
+      `).join('');
+
+      totalEl.textContent = real(r.total);
+
+      if (r.semPrecoBalcao && r.semPrecoBalcao.length > 0) {
+        avisoBalcaoEl.innerHTML = `
+          <div class="titulo">Peça sem preço de balcão</div>
+          <ul>${r.semPrecoBalcao.map(n => `<li>${escapar(n)}</li>`).join('')}</ul>
+          <div style="color:var(--aco-500); font-size:0.81rem; margin-top:0.3rem;">
+            Está usando o preço à vista do atacado. Cadastre o valor de balcão em Produtos.
+          </div>`;
+        avisoBalcaoEl.style.display = 'block';
+      } else {
+        avisoBalcaoEl.style.display = 'none';
+      }
+
+      if (r.semEstoque && r.semEstoque.length > 0) {
+        avisoEstoqueEl.innerHTML = `
+          <div class="titulo">Estoque não fecha</div>
+          <ul>${r.semEstoque.map(s => `<li>${escapar(s.nome)} — pedido ${s.pedido}, tem ${s.tem}</li>`).join('')}</ul>`;
+        avisoEstoqueEl.style.display = 'block';
+      } else {
+        avisoEstoqueEl.style.display = 'none';
+      }
+    }
+
+    itensEl.addEventListener('change', (e) => {
+      if (!e.target.classList.contains('qtd')) return;
+      const item = itens.find(i => i.produto_id === Number(e.target.dataset.id));
+      if (item) { item.quantidade = Math.max(1, Number(e.target.value) || 1); recalcular(); }
+    });
+
+    itensEl.addEventListener('click', (e) => {
+      const botao = e.target.closest('button[data-remover]');
+      if (botao) remover(Number(botao.dataset.remover));
+    });
+
+    // ---------- Meio de pagamento ----------
+    document.querySelectorAll('.meio-pagamento button').forEach(botao => {
+      botao.addEventListener('click', () => {
+        document.querySelectorAll('.meio-pagamento button').forEach(b => b.classList.remove('escolhido'));
+        botao.classList.add('escolhido');
+        meioPagamento = botao.dataset.meio;
+      });
+    });
+
+    // ---------- Finalizar ----------
+    function limpar() {
+      itens = [];
+      cacheProdutos = null;
+      document.getElementById('cliente').value = '';
+      recalcular();
+      buscaEl.focus();
+    }
+
+    async function finalizar(imprimir) {
+      if (!ultimoCalculo || itens.length === 0) {
+        alert('Adicione pelo menos uma peça.');
+        return;
+      }
+      const total = ultimoCalculo.total;
+      const id = await window.erpAPI.pedidos.salvar({
+        cliente: document.getElementById('cliente').value.trim(),
+        cliente_id: null,
+        formaPagamento: 'balcao',
+        meioPagamento,
+        linhas: ultimoCalculo.linhas,
+        total
+      });
+
+      if (imprimir) {
+        try {
+          await window.erpAPI.impressao.imprimir(id, { silencioso: false });
+        } catch (erro) {
+          alert(`Venda #${id} registrada, mas a impressão falhou:\n${erro.message}`);
+        }
+      } else {
+        alert(`Venda #${id} registrada. Total ${real(total)}.`);
+      }
+      limpar();
+    }
+
+    document.getElementById('btn-finalizar').addEventListener('click', () => finalizar(true));
+    document.getElementById('btn-so-salvar').addEventListener('click', () => finalizar(false));
+    document.getElementById('btn-limpar').addEventListener('click', limpar);
+
+    recalcular();
+    buscaEl.focus();
+  </script>
+</body>
+</html>

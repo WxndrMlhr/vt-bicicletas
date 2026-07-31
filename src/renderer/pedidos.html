@@ -84,9 +84,10 @@
         <div>
           <label class="campo" for="forma">Forma de pagamento</label>
           <select id="forma">
-            <option value="prazo">A prazo</option>
-            <option value="vista">À vista</option>
-            <option value="vista_retirada">À vista com retirada em loja</option>
+            <option value="balcao">Balcão (varejo)</option>
+            <option value="prazo">Atacado — a prazo</option>
+            <option value="vista">Atacado — à vista</option>
+            <option value="vista_retirada">Atacado — à vista com retirada</option>
           </select>
         </div>
         <div id="bloco-vencimento">
@@ -102,6 +103,7 @@
       </div>
     </div>
 
+    <div class="aviso-estoque" id="aviso-balcao"></div>
     <div class="aviso-estoque" id="aviso-estoque"></div>
 
     <div class="cartao">
@@ -152,6 +154,7 @@
     const totalEl = document.getElementById('total');
     const seloEl = document.getElementById('selo-2k');
     const avisoEstoqueEl = document.getElementById('aviso-estoque');
+    const avisoBalcaoEl = document.getElementById('aviso-balcao');
     const formaEl = document.getElementById('forma');
     const blocoVencEl = document.getElementById('bloco-vencimento');
 
@@ -255,6 +258,7 @@
         totalEl.textContent = real(0);
         seloEl.style.display = 'none';
         avisoEstoqueEl.style.display = 'none';
+        avisoBalcaoEl.style.display = 'none';
         ultimoCalculo = null;
         return;
       }
@@ -284,6 +288,20 @@
 
       totalEl.textContent = real(r.total);
       seloEl.style.display = r.descontoAcimaDe2k ? 'inline-block' : 'none';
+
+      // Aviso de peças sem preço de balcão cadastrado
+      if (r.semPrecoBalcao && r.semPrecoBalcao.length > 0) {
+        avisoBalcaoEl.innerHTML = `
+          <div class="titulo">Sem preço de balcão cadastrado</div>
+          <ul>${r.semPrecoBalcao.map(n => `<li><strong>${escapar(n)}</strong></li>`).join('')}</ul>
+          <div class="obs">
+            Estas peças estão sendo cobradas pelo preço de atacado à vista.
+            Cadastre o preço de balcão em Produtos para corrigir.
+          </div>`;
+        avisoBalcaoEl.style.display = 'block';
+      } else {
+        avisoBalcaoEl.style.display = 'none';
+      }
 
       // Aviso de estoque: informa, mas não impede a venda —
       // a contagem do sistema pode estar atrasada em relação à prateleira.

@@ -1,7 +1,8 @@
 // Monta a barra lateral em todas as telas e marca a página atual.
 (function () {
   const paginas = [
-    { arquivo: 'pedidos.html',    rotulo: 'Novo pedido' },
+    { arquivo: 'balcao.html',     rotulo: 'Balcão' },
+    { arquivo: 'pedidos.html',    rotulo: 'Pedido atacado' },
     { arquivo: 'historico.html',  rotulo: 'Pedidos' },
     { arquivo: 'clientes.html',   rotulo: 'Clientes' },
     { arquivo: 'produtos.html',   rotulo: 'Produtos' },

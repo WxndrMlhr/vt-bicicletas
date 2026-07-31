@@ -196,10 +196,13 @@ function garantirColuna(tabela, coluna, definicao) {
 
 garantirColuna('produtos', 'estoque', 'INTEGER NOT NULL DEFAULT 0');
 garantirColuna('produtos', 'estoque_minimo', 'INTEGER NOT NULL DEFAULT 0');
+garantirColuna('produtos', 'preco_balcao', 'REAL');
+garantirColuna('alteracoes_preco_itens', 'preco_balcao', 'REAL');
 garantirColuna('pedidos', 'cliente_id', 'INTEGER');
 garantirColuna('pedidos', 'cancelado', 'INTEGER NOT NULL DEFAULT 0');
 garantirColuna('pedidos', 'cancelado_em', 'TEXT');
 garantirColuna('pedidos', 'motivo_cancelamento', 'TEXT');
+garantirColuna('pedidos', 'meio_pagamento', 'TEXT');
 
 // Carrega automaticamente a tabela de preços da VT Bicicletas.
 // Só insere os itens que ainda não existem (compara pelo nome),
@@ -226,6 +229,27 @@ const carregarIniciais = db.transaction(() => {
 const novosProdutos = carregarIniciais();
 if (novosProdutos > 0) {
   console.log(`[VT Bicicletas] ${novosProdutos} produtos da tabela de preços carregados.`);
+}
+
+// Preços de balcão (varejo). Só preenche onde ainda está vazio,
+// para não sobrescrever valor que o usuário tenha ajustado no app.
+const { precosBalcao } = require('./dados-balcao');
+const definirBalcao = db.prepare(
+  'UPDATE produtos SET preco_balcao = ? WHERE nome = ? AND preco_balcao IS NULL'
+);
+
+const carregarBalcao = db.transaction(() => {
+  let preenchidos = 0;
+  for (const [nome, preco] of precosBalcao) {
+    const r = definirBalcao.run(preco, nome);
+    if (r.changes > 0) preenchidos++;
+  }
+  return preenchidos;
+});
+
+const novosBalcao = carregarBalcao();
+if (novosBalcao > 0) {
+  console.log(`[VT Bicicletas] ${novosBalcao} preços de balcão carregados.`);
 }
 
 module.exports = db;

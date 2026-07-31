@@ -111,6 +111,7 @@
     }
 
     const nomesForma = {
+      balcao: 'Balcao (varejo)',
       prazo: 'A prazo',
       vista: 'À vista',
       vista_retirada: 'À vista c/ retirada em loja'
@@ -143,7 +144,8 @@
 
       document.getElementById('total').textContent = formatarReal(pedido.total);
 
-      if (pedido.total >= 2000) {
+      // A regra dos R$ 2.000 vale só para pagamento à vista.
+      if (pedido.total >= 2000 && pedido.forma_pagamento === 'vista') {
         document.getElementById('aviso').textContent =
           '* Preço de retirada aplicado - entrega grátis em compras acima de R$ 2.000,00';
       }

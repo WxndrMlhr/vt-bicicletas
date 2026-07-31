@@ -12,24 +12,29 @@ function listarProdutos() {
   return db.prepare('SELECT * FROM produtos ORDER BY nome').all();
 }
 
-function adicionarProduto({ nome, categoria, preco_prazo, preco_vista, preco_vista_retirada }) {
+function adicionarProduto({ nome, categoria, preco_prazo, preco_vista, preco_vista_retirada, preco_balcao }) {
   const stmt = db.prepare(`
-    INSERT INTO produtos (nome, categoria, preco_prazo, preco_vista, preco_vista_retirada)
-    VALUES (@nome, @categoria, @preco_prazo, @preco_vista, @preco_vista_retirada)
+    INSERT INTO produtos (nome, categoria, preco_prazo, preco_vista, preco_vista_retirada, preco_balcao)
+    VALUES (@nome, @categoria, @preco_prazo, @preco_vista, @preco_vista_retirada, @preco_balcao)
   `);
-  const info = stmt.run({ nome, categoria, preco_prazo, preco_vista, preco_vista_retirada });
+  const info = stmt.run({
+    nome, categoria, preco_prazo, preco_vista,
+    preco_vista_retirada, preco_balcao: preco_balcao ?? null
+  });
   return info.lastInsertRowid;
 }
 
-function atualizarProduto(id, { nome, categoria, preco_prazo, preco_vista, preco_vista_retirada }) {
+function atualizarProduto(id, { nome, categoria, preco_prazo, preco_vista, preco_vista_retirada, preco_balcao }) {
   const anterior = db.prepare('SELECT * FROM produtos WHERE id = ?').get(id);
   if (!anterior) throw new Error('Peça não encontrada.');
 
   // Só registra no histórico se algum preço mudou de fato.
+  const balcaoNovo = preco_balcao ?? null;
   const mudouPreco =
     anterior.preco_prazo !== preco_prazo ||
     anterior.preco_vista !== preco_vista ||
-    anterior.preco_vista_retirada !== preco_vista_retirada;
+    anterior.preco_vista_retirada !== preco_vista_retirada ||
+    anterior.preco_balcao !== balcaoNovo;
 
   if (mudouPreco) {
     registrarAlteracao('individual', `Preço alterado: ${anterior.nome}`, [anterior]);
@@ -41,17 +46,22 @@ function atualizarProduto(id, { nome, categoria, preco_prazo, preco_vista, preco
         categoria = @categoria,
         preco_prazo = @preco_prazo,
         preco_vista = @preco_vista,
-        preco_vista_retirada = @preco_vista_retirada
+        preco_vista_retirada = @preco_vista_retirada,
+        preco_balcao = @preco_balcao
     WHERE id = @id
-  `).run({ id, nome, categoria, preco_prazo, preco_vista, preco_vista_retirada });
+  `).run({
+    id, nome, categoria, preco_prazo, preco_vista,
+    preco_vista_retirada, preco_balcao: balcaoNovo
+  });
 }
 
 function excluirProduto(id) {
   db.prepare('DELETE FROM produtos WHERE id = ?').run(id);
 }
 
-// Calcula o preço de um produto conforme a forma de pagamento
-// e aplica a regra especial para pedidos acima de R$ 2.000 (total do pedido).
+// Calcula o preço de um produto conforme a forma de pagamento.
+// A regra dos R$ 2.000 (preço de retirada) vale apenas para pagamento à vista —
+// pedido a prazo mantém o preço a prazo independente do total.
 function calcularPreco(produto, formaPagamento, totalPedido) {
   let preco;
   switch (formaPagamento) {
@@ -64,15 +74,15 @@ function calcularPreco(produto, formaPagamento, totalPedido) {
     case 'vista_retirada':
       preco = produto.preco_vista_retirada;
       break;
+    case 'balcao':
+      // Varejo: preço próprio, sem a regra dos R$ 2.000.
+      preco = produto.preco_balcao ?? produto.preco_vista;
+      break;
     default:
       throw new Error(`Forma de pagamento inválida: ${formaPagamento}`);
   }
 
-  // Regra "acima de 2k": pedidos com total igual ou maior que R$ 2.000
-  // usam o preço à vista com retirada em loja como referência,
-  // mesmo que a forma de pagamento escolhida seja outra.
-  // Se o produto não tiver preço de retirada cadastrado, usa o preço à vista normal.
-  if (totalPedido !== undefined && totalPedido >= 2000) {
+  if (formaPagamento === 'vista' && totalPedido !== undefined && totalPedido >= 2000) {
     const referencia = produto.preco_vista_retirada ?? produto.preco_vista;
     preco = Math.min(preco, referencia);
   }
@@ -90,12 +100,13 @@ function registrarAlteracao(tipo, descricao, produtosAfetados) {
   const alteracao_id = info.lastInsertRowid;
   const guardar = db.prepare(`
     INSERT INTO alteracoes_preco_itens
-      (alteracao_id, produto_id, preco_prazo, preco_vista, preco_vista_retirada)
-    VALUES (?, ?, ?, ?, ?)
+      (alteracao_id, produto_id, preco_prazo, preco_vista, preco_vista_retirada, preco_balcao)
+    VALUES (?, ?, ?, ?, ?, ?)
   `);
 
   for (const p of produtosAfetados) {
-    guardar.run(alteracao_id, p.id, p.preco_prazo, p.preco_vista, p.preco_vista_retirada);
+    guardar.run(alteracao_id, p.id, p.preco_prazo, p.preco_vista,
+                p.preco_vista_retirada, p.preco_balcao ?? null);
   }
   return alteracao_id;
 }
@@ -117,12 +128,13 @@ const desfazerAlteracao = db.transaction((id) => {
   const itens = db.prepare('SELECT * FROM alteracoes_preco_itens WHERE alteracao_id = ?').all(id);
   const restaurar = db.prepare(`
     UPDATE produtos
-    SET preco_prazo = ?, preco_vista = ?, preco_vista_retirada = ?
+    SET preco_prazo = ?, preco_vista = ?, preco_vista_retirada = ?, preco_balcao = ?
     WHERE id = ?
   `);
 
   for (const i of itens) {
-    restaurar.run(i.preco_prazo, i.preco_vista, i.preco_vista_retirada, i.produto_id);
+    restaurar.run(i.preco_prazo, i.preco_vista, i.preco_vista_retirada,
+                  i.preco_balcao ?? null, i.produto_id);
   }
 
   db.prepare('UPDATE alteracoes_preco SET desfeito = 1 WHERE id = ?').run(id);
@@ -157,6 +169,10 @@ const reajustarPrecos = db.transaction((percentual, categoria = '') => {
       preco_vista_retirada = CASE
         WHEN preco_vista_retirada IS NULL THEN NULL
         ELSE ROUND(preco_vista_retirada * ${fator}, 2)
+      END,
+      preco_balcao = CASE
+        WHEN preco_balcao IS NULL THEN NULL
+        ELSE ROUND(preco_balcao * ${fator}, 2)
       END
     ${onde}
   `).run(...params);

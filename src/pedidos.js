@@ -2,6 +2,8 @@ const db = require('./db');
 
 // Retorna o preço de um produto para uma forma de pagamento específica.
 // Se o produto não tiver preço de retirada cadastrado, cai para o preço à vista.
+// No balcão (varejo), se a peça não tiver preço próprio, cai para o preço à vista
+// e a tela avisa — melhor vender com aviso do que travar o atendimento.
 function precoPorForma(produto, forma) {
   switch (forma) {
     case 'prazo':
@@ -10,6 +12,8 @@ function precoPorForma(produto, forma) {
       return produto.preco_vista;
     case 'vista_retirada':
       return produto.preco_vista_retirada ?? produto.preco_vista;
+    case 'balcao':
+      return produto.preco_balcao ?? produto.preco_vista;
     default:
       throw new Error(`Forma de pagamento inválida: ${forma}`);
   }
@@ -37,7 +41,9 @@ function calcularPedido(itens, formaPagamento) {
         subtotal: +(preco_unitario * quantidade).toFixed(2),
         // Informativo: quanto existe em estoque e se dá para atender
         estoque_atual: produto.estoque ?? 0,
-        falta: quantidade - (produto.estoque ?? 0)
+        falta: quantidade - (produto.estoque ?? 0),
+        // Marca quando a peça não tem preço de balcão e caiu para o à vista
+        sem_preco_balcao: forma === 'balcao' && produto.preco_balcao == null
       };
     });
     const total = +linhas.reduce((soma, l) => soma + l.subtotal, 0).toFixed(2);
@@ -47,7 +53,10 @@ function calcularPedido(itens, formaPagamento) {
   let resultado = montar(formaPagamento);
   let descontoAcimaDe2k = false;
 
-  if (resultado.total >= 2000 && formaPagamento !== 'vista_retirada') {
+  // Regra dos R$ 2.000: vale só para pagamento à vista.
+  // Pedido a prazo mantém o preço a prazo, mesmo passando de 2 mil —
+  // o preço de retirada é uma condição de pagamento à vista.
+  if (formaPagamento === 'vista' && resultado.total >= 2000) {
     const comRetirada = montar('vista_retirada');
     if (comRetirada.total < resultado.total) {
       resultado = comRetirada;
@@ -56,6 +65,7 @@ function calcularPedido(itens, formaPagamento) {
   }
 
   const semEstoque = resultado.linhas.filter(l => l.falta > 0);
+  const semPrecoBalcao = resultado.linhas.filter(l => l.sem_preco_balcao);
 
   return {
     ...resultado,
@@ -66,18 +76,20 @@ function calcularPedido(itens, formaPagamento) {
       pedido: l.quantidade,
       tem: l.estoque_atual,
       falta: l.falta
-    }))
+    })),
+    semPrecoBalcao: semPrecoBalcao.map(l => l.nome)
   };
 }
 
 // Salva o pedido calculado no banco e devolve o id gerado.
 // Junto disso: dá baixa no estoque e, se for a prazo, abre a conta a receber.
-function salvarPedido({ cliente, cliente_id, formaPagamento, linhas, total, vencimento }) {
+function salvarPedido({ cliente, cliente_id, formaPagamento, linhas, total, vencimento, meioPagamento }) {
   const estoque = require('./estoque');
   const financeiro = require('./financeiro');
 
   const inserirPedido = db.prepare(
-    'INSERT INTO pedidos (cliente, cliente_id, forma_pagamento, total) VALUES (?, ?, ?, ?)'
+    `INSERT INTO pedidos (cliente, cliente_id, forma_pagamento, total, meio_pagamento)
+     VALUES (?, ?, ?, ?, ?)`
   );
   const inserirItem = db.prepare(`
     INSERT INTO pedido_itens (pedido_id, produto_id, nome, quantidade, preco_unitario, subtotal)
@@ -85,7 +97,7 @@ function salvarPedido({ cliente, cliente_id, formaPagamento, linhas, total, venc
   `);
 
   const transacao = db.transaction(() => {
-    const info = inserirPedido.run(cliente || null, cliente_id || null, formaPagamento, total);
+    const info = inserirPedido.run(cliente || null, cliente_id || null, formaPagamento, total, meioPagamento || null);
     const pedido_id = info.lastInsertRowid;
 
     for (const linha of linhas) {

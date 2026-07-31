@@ -24,7 +24,7 @@ function createWindow() {
     }
   });
 
-  win.loadFile(path.join(__dirname, 'renderer', 'pedidos.html'));
+  win.loadFile(path.join(__dirname, 'renderer', 'balcao.html'));
 
   // Descomente a linha abaixo se precisar diagnosticar algum erro na interface
   // win.webContents.openDevTools();
