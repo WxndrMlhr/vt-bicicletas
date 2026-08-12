@@ -228,6 +228,13 @@ function excluirPedido(id) {
 
     db.prepare('DELETE FROM contas_receber WHERE pedido_id = ?').run(id);
     db.prepare('UPDATE movimentacoes_estoque SET pedido_id = NULL WHERE pedido_id = ?').run(id);
+
+    // Se o pedido nasceu de um orçamento, a proposta volta a ficar em aberto:
+    // como a venda deixou de existir, ela não pode continuar apontando para ela.
+    db.prepare(`
+      UPDATE orcamentos SET pedido_id = NULL, situacao = 'aberto' WHERE pedido_id = ?
+    `).run(id);
+
     db.prepare('DELETE FROM pedido_itens WHERE pedido_id = ?').run(id);
     db.prepare('DELETE FROM pedidos WHERE id = ?').run(id);
 
@@ -254,6 +261,17 @@ function buscarPedido(id) {
     ORDER BY (vencimento IS NULL), vencimento, parcela
   `).all(id);
   pedido.vencimento = pedido.parcelas.length ? pedido.parcelas[0].vencimento : null;
+
+  // Contato do cliente cadastrado, para a via em folha A4 sair completa.
+  if (pedido.cliente_id) {
+    const c = db.prepare('SELECT nome, telefone, endereco FROM clientes WHERE id = ?')
+      .get(pedido.cliente_id);
+    if (c) {
+      pedido.cliente = pedido.cliente || c.nome;
+      pedido.telefone = c.telefone;
+      pedido.endereco = c.endereco;
+    }
+  }
 
   return pedido;
 }

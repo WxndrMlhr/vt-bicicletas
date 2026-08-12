@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Orçamentos — VT Bicicletas</title>
+  <link rel="stylesheet" href="estilo.css">
+  <style>
+    /* Bloco do total: a peça de destaque da tela */
+    .fecho {
+      background: var(--aco-900);
+      color: var(--branco);
+      border-radius: var(--raio);
+      padding: 1rem 1.2rem;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+    .fecho .rotulo {
+      font-family: var(--face-titulo);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-size: 0.82rem;
+      color: var(--aco-300);
+    }
+    .fecho .valor {
+      font-family: var(--face-numero);
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .selo-2k {
+      background: var(--sinal);
+      color: var(--aco-900);
+      font-size: 0.74rem;
+      font-weight: 700;
+      padding: 0.28rem 0.6rem;
+      border-radius: 2px;
+      margin-top: 0.6rem;
+      display: none;
+    }
+
+    /* Linha do item com "leader" pontilhado, como na tabela de preços impressa */
+    .item-nome { display: flex; align-items: baseline; gap: 0.4rem; }
+    .item-nome .pontos {
+      flex: 1;
+      border-bottom: 1px dotted var(--aco-300);
+      transform: translateY(-3px);
+    }
+    #tabela-itens input.qtd { width: 62px; padding: 0.28rem 0.35rem; }
+
+    .aviso-caixa {
+      display: none;
+      background: #FFF4EC;
+      border: 1px solid #F6C9A6;
+      border-left: 3px solid var(--oxido);
+      border-radius: var(--raio);
+      padding: 0.7rem 0.85rem;
+      font-size: 0.85rem;
+      margin-bottom: 1.1rem;
+    }
+    .aviso-caixa .titulo { font-weight: 700; color: var(--oxido); margin-bottom: 0.3rem; }
+    .aviso-caixa ul { margin: 0.2rem 0 0.4rem; padding-left: 1.1rem; }
+    .aviso-caixa li { margin-bottom: 0.15rem; }
+    .aviso-caixa .obs { color: var(--aco-500); font-size: 0.81rem; }
+
+    /* Faixa que aparece quando um orçamento salvo está sendo alterado */
+    .faixa-edicao {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      background: #EAF0F7;
+      border: 1px solid #C3D3E6;
+      border-left: 3px solid var(--azul);
+      border-radius: var(--raio);
+      padding: 0.7rem 0.9rem;
+      font-size: 0.87rem;
+      margin-bottom: 1.1rem;
+    }
+
+    .atalhos-prazo { display: flex; gap: 0.3rem; margin-top: 0.35rem; }
+    .atalhos-prazo button { flex: 1; padding: 0.28rem 0.2rem; font-size: 0.75rem; }
+    .atalhos-prazo button.escolhido {
+      background: var(--aco-900);
+      color: var(--branco);
+      border-color: var(--aco-900);
+    }
+
+    .meio-pagamento { display: flex; gap: 0.4rem; }
+    .meio-pagamento button {
+      flex: 1;
+      background: var(--branco);
+      border: 1px solid var(--aco-100);
+      color: var(--aco-700);
+    }
+    .meio-pagamento button.escolhido {
+      background: var(--aco-900);
+      color: var(--branco);
+      border-color: var(--aco-900);
+    }
+
+    .caixa-acao {
+      display: none;
+      margin-top: 1.1rem;
+      padding: 0.9rem;
+      background: var(--papel);
+      border: 1px solid var(--aco-100);
+      border-radius: var(--raio);
+    }
+  </style>
+</head>
+<body>
+  <script src="menu.js"></script>
+
+  <main class="conteudo">
+    <h1 class="titulo-pagina">Orçamentos</h1>
+    <p class="subtitulo-pagina">
+      Monte uma proposta para o cliente, salve em PDF e, quando ele aprovar, transforme em pedido.
+    </p>
+
+    <div class="abas">
+      <button class="aba ativa" data-painel="novo">Novo orçamento</button>
+      <button class="aba" data-painel="salvos">Orçamentos salvos</button>
+    </div>
+
+    <!-- ============================ NOVO ============================ -->
+    <section id="painel-novo">
+      <div class="faixa-edicao" id="faixa-edicao">
+        <span id="texto-edicao"></span>
+        <button class="neutro mini" id="btn-cancelar-edicao">Descartar alterações</button>
+      </div>
+
+      <div class="cartao">
+        <div class="linha-campos c4">
+          <div class="campo-busca">
+            <label class="campo" for="cliente">Cliente</label>
+            <input type="text" id="cliente" placeholder="Nome do cliente" autocomplete="off">
+            <div class="sugestoes" id="sug-cliente"></div>
+          </div>
+          <div>
+            <label class="campo" for="telefone">Telefone</label>
+            <input type="text" id="telefone" placeholder="(21) 90000-0000" autocomplete="off">
+          </div>
+          <div>
+            <label class="campo" for="forma">Forma de pagamento</label>
+            <select id="forma">
+              <option value="prazo">A prazo</option>
+              <option value="vista">À vista</option>
+              <option value="vista_retirada">À vista com retirada em loja</option>
+              <option value="balcao">Balcão (varejo)</option>
+            </select>
+          </div>
+          <div>
+            <label class="campo" for="validade">Válido até</label>
+            <input type="date" id="validade">
+          </div>
+        </div>
+
+        <div class="campo-busca">
+          <label class="campo" for="busca">Adicionar peça ao orçamento</label>
+          <input type="text" id="busca" placeholder="Digite o nome da peça — ex: roda livre, pneu 26, quadro aro 29" autocomplete="off">
+          <div class="sugestoes" id="sug-produto"></div>
+        </div>
+      </div>
+
+      <div class="aviso-caixa" id="aviso-balcao"></div>
+      <div class="aviso-caixa" id="aviso-estoque"></div>
+
+      <div class="cartao">
+        <table id="tabela-itens">
+          <thead>
+            <tr>
+              <th>Peça</th>
+              <th class="num" style="width: 90px;">Qtd</th>
+              <th class="num" style="width: 110px;">Unitário</th>
+              <th class="num" style="width: 120px;">Subtotal</th>
+              <th style="width: 1%;"></th>
+            </tr>
+          </thead>
+          <tbody id="itens"></tbody>
+        </table>
+      </div>
+
+      <div class="cartao">
+        <label class="campo" for="observacoes">Observações (saem no PDF)</label>
+        <textarea id="observacoes"
+          placeholder="Ex: prazo de entrega de 3 dias úteis; frete incluso para Nova Iguaçu; peças sob encomenda."></textarea>
+      </div>
+
+      <div class="grade-2">
+        <div>
+          <div class="fecho">
+            <span class="rotulo">Total do orçamento</span>
+            <span class="valor" id="total">R$ 0,00</span>
+          </div>
+          <div class="selo-2k" id="selo-2k">
+            Preço de retirada aplicado — acima de R$ 2.000,00, entrega grátis
+          </div>
+        </div>
+
+        <div class="acoes" style="align-items: center; height: 100%;">
+          <button class="neutro" id="btn-limpar">Limpar</button>
+          <button class="neutro" id="btn-salvar">Só salvar</button>
+          <button id="btn-salvar-pdf">Salvar e gerar PDF</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================== SALVOS =========================== -->
+    <section id="painel-salvos" style="display:none;">
+      <div class="grade-4" style="margin-bottom: 1.1rem;">
+        <div class="indicador destaque">
+          <div class="rotulo">Em aberto</div>
+          <div class="valor" id="r-abertos">0</div>
+          <div class="nota" id="r-valor-aberto">R$ 0,00 aguardando resposta</div>
+        </div>
+        <div class="indicador alerta">
+          <div class="rotulo">Vencidos</div>
+          <div class="valor" id="r-expirados">0</div>
+          <div class="nota">Passaram da validade</div>
+        </div>
+        <div class="indicador positivo">
+          <div class="rotulo">Aprovados</div>
+          <div class="valor" id="r-aprovados">0</div>
+          <div class="nota" id="r-valor-aprovado">R$ 0,00 fechados</div>
+        </div>
+        <div class="indicador">
+          <div class="rotulo">Recusados</div>
+          <div class="valor" id="r-recusados">0</div>
+          <div class="nota">Cliente não fechou</div>
+        </div>
+      </div>
+
+      <div class="abas" id="filtros">
+        <button class="aba ativa" data-filtro="todos">Todos</button>
+        <button class="aba" data-filtro="aberto">Em aberto</button>
+        <button class="aba" data-filtro="expirado">Vencidos</button>
+        <button class="aba" data-filtro="aprovado">Aprovados</button>
+        <button class="aba" data-filtro="recusado">Recusados</button>
+        <div style="margin-left:auto;">
+          <button class="neutro mini" id="btn-abrir-pasta">Abrir pasta dos PDFs</button>
+        </div>
+      </div>
+
+      <div class="grade-larga">
+        <section>
+          <div class="cartao">
+            <div class="rolagem">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Data</th>
+                    <th>Cliente</th>
+                    <th>Situação</th>
+                    <th class="num">Total</th>
+                  </tr>
+                </thead>
+                <tbody id="lista"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <div class="cartao" id="detalhe">
+            <p class="vazio">Escolha um orçamento na lista para ver os detalhes.</p>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // ---------- Base ----------
+    const real = v => (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const escapar = t => String(t ?? '').replace(/[<>&"]/g,
+      c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+
+    const nomesForma = {
+      balcao: 'Balcão (varejo)',
+      prazo: 'A prazo',
+      vista: 'À vista',
+      vista_retirada: 'À vista c/ retirada'
+    };
+
+    // 'AAAA-MM-DD' ou 'AAAA-MM-DD HH:MM:SS'
+    function dia(texto) {
+      if (!texto) return '—';
+      const [a, m, d] = texto.slice(0, 10).split('-');
+      return `${d}/${m}/${a}`;
+    }
+    function dataHora(texto) {
+      if (!texto) return '—';
+      const [data, hora] = texto.split(' ');
+      return dia(data) + (hora ? ` ${hora.slice(0, 5)}` : '');
+    }
+    function dataISO(d) {
+      const p = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+    }
+
+    function etiquetaSituacao(o) {
+      const mapa = {
+        aberto:   ['neutra',  'Em aberto'],
+        expirado: ['atencao', 'Vencido'],
+        aprovado: ['ok',      'Aprovado'],
+        recusado: ['critica', 'Recusado']
+      };
+      const [classe, texto] = mapa[o.situacao_efetiva] || ['neutra', o.situacao_efetiva];
+      return `<span class="etiqueta ${classe}">${texto}</span>`;
+    }
+
+    // ---------- Abas ----------
+    const painelNovoEl = document.getElementById('painel-novo');
+    const painelSalvosEl = document.getElementById('painel-salvos');
+
+    async function abrirAba(nome) {
+      document.querySelectorAll('.abas .aba[data-painel]').forEach(b =>
+        b.classList.toggle('ativa', b.dataset.painel === nome));
+      painelNovoEl.style.display = nome === 'novo' ? 'block' : 'none';
+      painelSalvosEl.style.display = nome === 'salvos' ? 'block' : 'none';
+      if (nome === 'salvos') await carregarLista();
+      else buscaEl.focus();
+    }
+
+    document.querySelectorAll('.abas .aba[data-painel]').forEach(botao => {
+      botao.addEventListener('click', () => abrirAba(botao.dataset.painel));
+    });
+
+    // ================= NOVO ORÇAMENTO =================
+    let itens = [];            // [{ produto_id, nome, quantidade }]
+    let ultimoCalculo = null;
+    let clienteId = null;      // preenchido quando escolhe um cliente cadastrado
+    let cacheProdutos = null;
+    let editandoId = null;     // id do orçamento salvo que está sendo alterado
+
+    const buscaEl = document.getElementById('busca');
+    const sugProdEl = document.getElementById('sug-produto');
+    const clienteEl = document.getElementById('cliente');
+    const telefoneEl = document.getElementById('telefone');
+    const sugCliEl = document.getElementById('sug-cliente');
+    const itensEl = document.getElementById('itens');
+    const totalEl = document.getElementById('total');
+    const seloEl = document.getElementById('selo-2k');
+    const formaEl = document.getElementById('forma');
+    const validadeEl = document.getElementById('validade');
+    const observacoesEl = document.getElementById('observacoes');
+    const avisoEstoqueEl = document.getElementById('aviso-estoque');
+    const avisoBalcaoEl = document.getElementById('aviso-balcao');
+    const faixaEdicaoEl = document.getElementById('faixa-edicao');
+    const btnSalvarEl = document.getElementById('btn-salvar');
+    const btnSalvarPdfEl = document.getElementById('btn-salvar-pdf');
+
+    // ---------- Busca de peça ----------
+    async function procurarProdutos(termo) {
+      const encontrados = await window.erpAPI.produtos.buscar(termo);
+      if (encontrados && encontrados.length > 0) return encontrados;
+      if (!cacheProdutos) cacheProdutos = await window.erpAPI.produtos.listar();
+      const alvo = termo.toLowerCase();
+      return cacheProdutos.filter(p => p.nome.toLowerCase().includes(alvo));
+    }
+
+    let tProduto;
+    buscaEl.addEventListener('input', (e) => {
+      clearTimeout(tProduto);
+      const termo = e.target.value.trim();
+      if (!termo) { sugProdEl.style.display = 'none'; return; }
+      tProduto = setTimeout(async () => {
+        try {
+          const achados = await procurarProdutos(termo);
+          sugProdEl.innerHTML = achados.length
+            ? achados.slice(0, 25).map(p => `
+                <div class="sugestao" data-id="${p.id}" data-nome="${escapar(p.nome)}">
+                  ${escapar(p.nome)}
+                  <span class="apoio"> ${real(p.preco_vista)}</span>
+                </div>`).join('')
+            : '<div class="sugestao" style="color:var(--aco-500)">Nenhuma peça com esse nome.</div>';
+          sugProdEl.style.display = 'block';
+        } catch (erro) {
+          sugProdEl.innerHTML = `<div class="sugestao" style="color:var(--oxido)">Erro na busca: ${escapar(erro.message)}</div>`;
+          sugProdEl.style.display = 'block';
+        }
+      }, 180);
+    });
+
+    sugProdEl.addEventListener('click', (e) => {
+      const opcao = e.target.closest('.sugestao[data-id]');
+      if (!opcao) return;
+      adicionarItem(Number(opcao.dataset.id), opcao.dataset.nome);
+      buscaEl.value = '';
+      sugProdEl.style.display = 'none';
+      buscaEl.focus();
+    });
+
+    // ---------- Busca de cliente ----------
+    let tCliente;
+    clienteEl.addEventListener('input', (e) => {
+      clearTimeout(tCliente);
+      clienteId = null; // digitou à mão, então deixa de ser um cliente vinculado
+      const termo = e.target.value.trim();
+      if (termo.length < 2) { sugCliEl.style.display = 'none'; return; }
+      tCliente = setTimeout(async () => {
+        const achados = await window.erpAPI.clientes.buscar(termo);
+        if (achados.length === 0) { sugCliEl.style.display = 'none'; return; }
+        sugCliEl.innerHTML = achados.map(c => `
+          <div class="sugestao" data-id="${c.id}" data-nome="${escapar(c.nome)}"
+               data-telefone="${escapar(c.telefone)}">
+            ${escapar(c.nome)}
+            ${c.telefone ? `<span class="apoio"> ${escapar(c.telefone)}</span>` : ''}
+          </div>`).join('');
+        sugCliEl.style.display = 'block';
+      }, 180);
+    });
+
+    sugCliEl.addEventListener('click', (e) => {
+      const opcao = e.target.closest('.sugestao[data-id]');
+      if (!opcao) return;
+      clienteId = Number(opcao.dataset.id);
+      clienteEl.value = opcao.dataset.nome;
+      if (opcao.dataset.telefone) telefoneEl.value = opcao.dataset.telefone;
+      sugCliEl.style.display = 'none';
+    });
+
+    document.addEventListener('click', (e) => {
+      if (e.target !== buscaEl && !sugProdEl.contains(e.target)) sugProdEl.style.display = 'none';
+      if (e.target !== clienteEl && !sugCliEl.contains(e.target)) sugCliEl.style.display = 'none';
+    });
+
+    // ---------- Itens ----------
+    function adicionarItem(produto_id, nome) {
+      const existente = itens.find(i => i.produto_id === produto_id);
+      if (existente) existente.quantidade += 1;
+      else itens.push({ produto_id, nome, quantidade: 1 });
+      recalcular();
+    }
+
+    function removerItem(produto_id) {
+      itens = itens.filter(i => i.produto_id !== produto_id);
+      recalcular();
+    }
+
+    function alterarQuantidade(produto_id, quantidade) {
+      const item = itens.find(i => i.produto_id === produto_id);
+      if (item) { item.quantidade = Math.max(1, quantidade); recalcular(); }
+    }
+
+    async function recalcular() {
+      if (itens.length === 0) {
+        itensEl.innerHTML = '<tr><td colspan="5" class="vazio">Nenhuma peça ainda. Use o campo acima para adicionar.</td></tr>';
+        totalEl.textContent = real(0);
+        seloEl.style.display = 'none';
+        avisoEstoqueEl.style.display = 'none';
+        avisoBalcaoEl.style.display = 'none';
+        ultimoCalculo = null;
+        return;
+      }
+
+      const r = await window.erpAPI.orcamentos.calcular(
+        itens.map(({ produto_id, quantidade }) => ({ produto_id, quantidade })),
+        formaEl.value
+      );
+      ultimoCalculo = r;
+
+      itensEl.innerHTML = r.linhas.map(l => `
+        <tr>
+          <td>
+            <div class="item-nome"><span>${escapar(l.nome)}</span><span class="pontos"></span></div>
+            ${l.falta > 0
+              ? `<span class="etiqueta atencao" style="margin-top:0.2rem;">Tem ${l.estoque_atual} em estoque</span>`
+              : ''}
+          </td>
+          <td class="num">
+            <input type="number" class="qtd" min="1" value="${l.quantidade}" data-id="${l.produto_id}">
+          </td>
+          <td class="num">${real(l.preco_unitario)}</td>
+          <td class="num" style="font-weight:700;">${real(l.subtotal)}</td>
+          <td><button class="perigo mini" data-remover="${l.produto_id}">Tirar</button></td>
+        </tr>
+      `).join('');
+
+      totalEl.textContent = real(r.total);
+      seloEl.style.display = r.descontoAcimaDe2k ? 'inline-block' : 'none';
+
+      if (r.semPrecoBalcao && r.semPrecoBalcao.length > 0) {
+        avisoBalcaoEl.innerHTML = `
+          <div class="titulo">Sem preço de balcão cadastrado</div>
+          <ul>${r.semPrecoBalcao.map(n => `<li><strong>${escapar(n)}</strong></li>`).join('')}</ul>
+          <div class="obs">
+            Estas peças estão sendo orçadas pelo preço de atacado à vista.
+            Cadastre o preço de balcão em Produtos para corrigir.
+          </div>`;
+        avisoBalcaoEl.style.display = 'block';
+      } else {
+        avisoBalcaoEl.style.display = 'none';
+      }
+
+      // No orçamento o estoque é só informação: nada é reservado nem baixado.
+      // Serve para o vendedor já avisar o cliente sobre o que é encomenda.
+      if (r.semEstoque && r.semEstoque.length > 0) {
+        avisoEstoqueEl.innerHTML = `
+          <div class="titulo">Peças que não estão na prateleira</div>
+          <ul>
+            ${r.semEstoque.map(s => `
+              <li>
+                <strong>${escapar(s.nome)}</strong> —
+                orçado ${s.pedido}, tem ${s.tem} ${s.tem === 1 ? 'peça' : 'peças'}
+                (faltam ${s.falta})
+              </li>`).join('')}
+          </ul>
+          <div class="obs">
+            Dá para orçar assim mesmo — nada é reservado. Vale avisar o cliente
+            de que essas peças entram como encomenda.
+          </div>`;
+        avisoEstoqueEl.style.display = 'block';
+      } else {
+        avisoEstoqueEl.style.display = 'none';
+      }
+    }
+
+    itensEl.addEventListener('change', (e) => {
+      if (e.target.classList.contains('qtd')) {
+        alterarQuantidade(Number(e.target.dataset.id), Number(e.target.value));
+      }
+    });
+
+    itensEl.addEventListener('click', (e) => {
+      const botao = e.target.closest('button[data-remover]');
+      if (botao) removerItem(Number(botao.dataset.remover));
+    });
+
+    formaEl.addEventListener('change', recalcular);
+
+    // ---------- Salvar ----------
+    function dadosDoFormulario() {
+      return {
+        cliente: clienteEl.value.trim(),
+        cliente_id: clienteId,
+        telefone: telefoneEl.value.trim(),
+        formaPagamento: ultimoCalculo.formaPagamento,
+        linhas: ultimoCalculo.linhas,
+        total: ultimoCalculo.total,
+        validade: validadeEl.value || null,
+        observacoes: observacoesEl.value.trim()
+      };
+    }
+
+    // Devolve o id do orçamento gravado, ou null se não deu para salvar.
+    async function salvarOrcamentoAtual() {
+      if (!ultimoCalculo || itens.length === 0) {
+        alert('Adicione pelo menos uma peça ao orçamento.');
+        return null;
+      }
+      try {
+        const dados = dadosDoFormulario();
+        if (editandoId) {
+          await window.erpAPI.orcamentos.atualizar(editandoId, dados);
+          return editandoId;
+        }
+        return await window.erpAPI.orcamentos.salvar(dados);
+      } catch (erro) {
+        alert(`Não deu para salvar o orçamento:\n${erro.message}`);
+        return null;
+      }
+    }
+
+    async function limparFormulario() {
+      itens = [];
+      clienteId = null;
+      editandoId = null;
+      clienteEl.value = '';
+      telefoneEl.value = '';
+      observacoesEl.value = '';
+      formaEl.value = 'prazo';
+      cacheProdutos = null;
+      faixaEdicaoEl.style.display = 'none';
+      btnSalvarEl.textContent = 'Só salvar';
+      btnSalvarPdfEl.textContent = 'Salvar e gerar PDF';
+      validadeEl.value = await window.erpAPI.orcamentos.validadePadrao();
+      recalcular();
+    }
+
+    // Traz um orçamento salvo de volta para o formulário.
+    function carregarNoFormulario(orcamento) {
+      editandoId = orcamento.id;
+      clienteId = orcamento.cliente_id || null;
+      clienteEl.value = orcamento.cliente || '';
+      telefoneEl.value = orcamento.telefone || '';
+      formaEl.value = orcamento.forma_pagamento;
+      validadeEl.value = (orcamento.validade || '').slice(0, 10);
+      observacoesEl.value = orcamento.observacoes || '';
+      itens = orcamento.itens.map(i => ({
+        produto_id: i.produto_id,
+        nome: i.nome,
+        quantidade: i.quantidade
+      }));
+
+      document.getElementById('texto-edicao').innerHTML =
+        `Alterando o <strong>orçamento #${orcamento.id}</strong>. ` +
+        'Ao salvar, os itens e os valores são substituídos.';
+      faixaEdicaoEl.style.display = 'flex';
+      btnSalvarEl.textContent = 'Salvar alterações';
+      btnSalvarPdfEl.textContent = 'Salvar e gerar PDF';
+
+      abrirAba('novo');
+      recalcular();
+    }
+
+    document.getElementById('btn-cancelar-edicao').addEventListener('click', limparFormulario);
+    document.getElementById('btn-limpar').addEventListener('click', limparFormulario);
+
+    btnSalvarEl.addEventListener('click', async () => {
+      const total = ultimoCalculo?.total;
+      const eraEdicao = editandoId;
+      const id = await salvarOrcamentoAtual();
+      if (!id) return;
+      alert(eraEdicao
+        ? `Orçamento #${id} atualizado. Total ${real(total)}.`
+        : `Orçamento #${id} salvo. Total ${real(total)}.`);
+      await limparFormulario();
+      await abrirAba('salvos');
+      selecionar(id);
+    });
+
+    btnSalvarPdfEl.addEventListener('click', async (ev) => {
+      const id = await salvarOrcamentoAtual();
+      if (!id) return;
+      await gerarPDF(id, ev.target);
+      await limparFormulario();
+      await abrirAba('salvos');
+      selecionar(id);
+    });
+
+    // ---------- PDF ----------
+    async function gerarPDF(id, botao) {
+      const rotulo = botao ? botao.textContent : null;
+      if (botao) { botao.disabled = true; botao.textContent = 'Gerando...'; }
+      try {
+        const r = await window.erpAPI.orcamentos.salvarPDF(id, { abrirDepois: true });
+        if (r.cancelado) return false;
+        return true;
+      } catch (erro) {
+        alert(`O orçamento #${id} está salvo, mas o PDF falhou:\n${erro.message}`);
+        return false;
+      } finally {
+        if (botao) { botao.disabled = false; botao.textContent = rotulo; }
+      }
+    }
+
+    // ================= ORÇAMENTOS SALVOS =================
+    const listaEl = document.getElementById('lista');
+    const detalheEl = document.getElementById('detalhe');
+    let filtro = 'todos';
+    let selecionado = null;
+
+    document.querySelectorAll('#filtros .aba[data-filtro]').forEach(botao => {
+      botao.addEventListener('click', () => {
+        filtro = botao.dataset.filtro;
+        document.querySelectorAll('#filtros .aba').forEach(b => b.classList.remove('ativa'));
+        botao.classList.add('ativa');
+        carregarLista();
+      });
+    });
+
+    document.getElementById('btn-abrir-pasta').addEventListener('click', () =>
+      window.erpAPI.orcamentos.abrirPasta());
+
+    async function carregarResumo() {
+      const r = await window.erpAPI.orcamentos.resumo();
+      document.getElementById('r-abertos').textContent = r.abertos;
+      document.getElementById('r-valor-aberto').textContent = `${real(r.valor_aberto)} aguardando resposta`;
+      document.getElementById('r-expirados').textContent = r.expirados;
+      document.getElementById('r-aprovados').textContent = r.aprovados;
+      document.getElementById('r-valor-aprovado').textContent = `${real(r.valor_aprovado)} fechados`;
+      document.getElementById('r-recusados').textContent = r.recusados;
+    }
+
+    async function carregarLista() {
+      await carregarResumo();
+      const lista = await window.erpAPI.orcamentos.listar(filtro);
+      listaEl.innerHTML = lista.length
+        ? lista.map(o => `
+            <tr class="clicavel ${selecionado === o.id ? 'selecionada' : ''}" data-id="${o.id}">
+              <td class="dinheiro">#${o.id}</td>
+              <td>${dia(o.criado_em)}</td>
+              <td>${escapar(o.cliente) || '<span style="color:var(--aco-500)">—</span>'}</td>
+              <td>${etiquetaSituacao(o)}</td>
+              <td class="num" style="font-weight:700;">${real(o.total)}</td>
+            </tr>`).join('')
+        : `<tr><td colspan="5" class="vazio">
+             ${filtro === 'todos'
+               ? 'Nenhum orçamento ainda. Comece em “Novo orçamento”.'
+               : 'Nenhum orçamento nesse filtro.'}
+           </td></tr>`;
+    }
+
+    listaEl.addEventListener('click', (e) => {
+      const linha = e.target.closest('tr[data-id]');
+      if (linha) selecionar(Number(linha.dataset.id));
+    });
+
+    async function selecionar(id) {
+      selecionado = id;
+      document.querySelectorAll('#lista tr[data-id]').forEach(tr =>
+        tr.classList.toggle('selecionada', Number(tr.dataset.id) === id));
+      mostrarDetalhe(await window.erpAPI.orcamentos.buscar(id));
+    }
+
+    function mostrarDetalhe(orcamento) {
+      if (!orcamento) {
+        detalheEl.innerHTML = '<p class="vazio">Orçamento não encontrado.</p>';
+        return;
+      }
+
+      const virouPedido = !!orcamento.pedido_id;
+      const contato = [orcamento.telefone, orcamento.endereco].filter(Boolean);
+
+      detalheEl.innerHTML = `
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:0.6rem;">
+          <h2 class="secao" style="margin:0;">Orçamento #${orcamento.id}</h2>
+          ${etiquetaSituacao(orcamento)}
+        </div>
+
+        ${virouPedido ? `
+          <div style="background:#EDF6F1; border:1px solid #B7D9C7; border-left:3px solid var(--verde);
+                      border-radius:var(--raio); padding:0.7rem 0.85rem; font-size:0.85rem; margin:0.9rem 0;">
+            <strong style="color:var(--verde);">Aprovado e faturado</strong>
+            — virou o pedido <strong>#${orcamento.pedido_id}</strong>.
+            <br><span style="color:var(--aco-500); font-size:0.81rem;">
+              As peças já saíram do estoque e a cobrança, se houver, está em “A receber”.
+              Este orçamento não pode mais ser alterado.
+            </span>
+          </div>` : ''}
+
+        ${orcamento.situacao_efetiva === 'expirado' ? `
+          <div style="background:#FCF6E4; border:1px solid #E8D08C; border-left:3px solid var(--ambar-alto);
+                      border-radius:var(--raio); padding:0.7rem 0.85rem; font-size:0.85rem; margin:0.9rem 0;">
+            <strong style="color:var(--ambar-alto);">Validade vencida</strong>
+            em ${dia(orcamento.validade)}.
+            <br><span style="color:var(--aco-500); font-size:0.81rem;">
+              Confira os preços antes de fechar, ou prorrogue a validade.
+            </span>
+          </div>` : ''}
+
+        <div style="color: var(--aco-500); font-size: 0.85rem; margin: 0.9rem 0 1rem;">
+          Emitido em ${dataHora(orcamento.criado_em)} ·
+          válido até ${dia(orcamento.validade)}<br>
+          ${escapar(orcamento.cliente) || 'sem cliente'}${contato.length ? ' · ' + contato.map(escapar).join(' · ') : ''}<br>
+          ${nomesForma[orcamento.forma_pagamento] || orcamento.forma_pagamento}
+        </div>
+
+        <table>
+          <thead>
+            <tr><th>Peça</th><th class="num">Qtd</th><th class="num">Unit.</th><th class="num">Subtotal</th></tr>
+          </thead>
+          <tbody>
+            ${orcamento.itens.map(i => `
+              <tr>
+                <td>${escapar(i.nome)}</td>
+                <td class="num">${i.quantidade}</td>
+                <td class="num">${real(i.preco_unitario)}</td>
+                <td class="num">${real(i.subtotal)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:0.9rem;
+                    padding-top:0.7rem; border-top:2px solid var(--aco-900);">
+          <span style="font-family:var(--face-titulo); letter-spacing:0.1em; text-transform:uppercase; font-size:0.8rem;">Total</span>
+          <span class="dinheiro" style="font-size:1.4rem; font-weight:700;">${real(orcamento.total)}</span>
+        </div>
+
+        ${orcamento.observacoes ? `
+          <div style="margin-top:1rem;">
+            <h2 class="secao" style="margin-bottom:0.4rem;">Observações</h2>
+            <div style="font-size:0.85rem; white-space:pre-wrap; color:var(--aco-700);">${escapar(orcamento.observacoes)}</div>
+          </div>` : ''}
+
+        <!-- Painel de aprovação: aparece ao clicar em "Aprovar e gerar pedido" -->
+        <div class="caixa-acao" id="area-aprovar">
+          <div style="font-size:0.85rem; color:var(--aco-700); margin-bottom:0.7rem;">
+            Ao confirmar, este orçamento vira um pedido: as peças saem do estoque
+            ${orcamento.forma_pagamento === 'prazo' ? 'e as parcelas entram em “A receber”.' : '.'}
+          </div>
+
+          ${orcamento.forma_pagamento === 'prazo' ? `
+            <div class="linha-campos c2">
+              <div>
+                <label class="campo" for="qtd-parcelas">Parcelas</label>
+                <input type="number" id="qtd-parcelas" min="1" max="24" value="1">
+              </div>
+              <div>
+                <label class="campo">Intervalo</label>
+                <div class="atalhos-prazo">
+                  <button type="button" class="neutro mini" data-intervalo="7">Semanal</button>
+                  <button type="button" class="neutro mini" data-intervalo="15">Quinzenal</button>
+                  <button type="button" class="neutro mini escolhido" data-intervalo="30">Mensal</button>
+                </div>
+              </div>
+            </div>
+            <table style="margin-bottom:0.7rem;">
+              <thead>
+                <tr><th style="width:80px;">Parcela</th><th style="width:150px;">Vence em</th><th class="num">Valor</th></tr>
+              </thead>
+              <tbody id="linhas-parcelas"></tbody>
+            </table>
+          ` : `
+            <label class="campo">Como o cliente vai pagar</label>
+            <div class="meio-pagamento" style="margin-bottom:0.7rem;">
+              <button type="button" class="mini escolhido" data-meio="dinheiro">Dinheiro / Pix</button>
+              <button type="button" class="mini" data-meio="cartao">Cartão</button>
+            </div>
+          `}
+
+          <div class="acoes">
+            <button class="neutro mini" id="btn-aprovar-nao">Voltar</button>
+            <button class="mini" id="btn-aprovar-sim">Confirmar e gerar pedido</button>
+          </div>
+        </div>
+
+        <!-- Painel de prorrogação -->
+        <div class="caixa-acao" id="area-prorrogar">
+          <label class="campo" for="nova-validade">Nova validade</label>
+          <input type="date" id="nova-validade">
+          <div class="acoes" style="margin-top:0.7rem;">
+            <button class="neutro mini" id="btn-prorrogar-nao">Voltar</button>
+            <button class="mini" id="btn-prorrogar-sim">Prorrogar</button>
+          </div>
+        </div>
+
+        <div class="acoes" style="margin-top:1.1rem; flex-wrap:wrap;">
+          <button class="perigo mini" id="btn-excluir">Excluir</button>
+          ${virouPedido ? '' : `
+            <button class="neutro mini" id="btn-editar">Editar</button>
+            <button class="neutro mini" id="btn-prorrogar">Prorrogar validade</button>
+            ${orcamento.situacao === 'recusado'
+              ? '<button class="neutro mini" id="btn-reabrir">Reabrir</button>'
+              : '<button class="neutro mini" id="btn-recusar">Marcar como recusado</button>'}
+          `}
+          <button class="neutro mini" id="btn-imprimir">Imprimir</button>
+          <button class="mini" id="btn-pdf">Salvar em PDF</button>
+          ${virouPedido ? '' : '<button class="mini" id="btn-aprovar">Aprovar e gerar pedido</button>'}
+        </div>
+      `;
+
+      ligarAcoesDetalhe(orcamento);
+    }
+
+    function ligarAcoesDetalhe(orcamento) {
+      const em = id => document.getElementById(id);
+      const quando = (id, evento, fn) => { const el = em(id); if (el) el.addEventListener(evento, fn); };
+
+      // --- PDF e impressão ---
+      quando('btn-pdf', 'click', (ev) => gerarPDF(orcamento.id, ev.target));
+
+      quando('btn-imprimir', 'click', async (ev) => {
+        const botao = ev.target;
+        const rotulo = botao.textContent;
+        botao.disabled = true;
+        botao.textContent = 'Imprimindo...';
+        try {
+          await window.erpAPI.orcamentos.imprimir(orcamento.id, { silencioso: false });
+        } catch (erro) {
+          alert(`Não deu para imprimir: ${erro.message}`);
+        }
+        botao.disabled = false;
+        botao.textContent = rotulo;
+      });
+
+      // --- Editar ---
+      quando('btn-editar', 'click', () => carregarNoFormulario(orcamento));
+
+      // --- Recusar / reabrir ---
+      quando('btn-recusar', 'click', async () => {
+        try {
+          await window.erpAPI.orcamentos.definirSituacao(orcamento.id, 'recusado');
+          await carregarLista();
+          selecionar(orcamento.id);
+        } catch (erro) {
+          alert(`Não deu para marcar: ${erro.message}`);
+        }
+      });
+
+      quando('btn-reabrir', 'click', async () => {
+        try {
+          await window.erpAPI.orcamentos.definirSituacao(orcamento.id, 'aberto');
+          await carregarLista();
+          selecionar(orcamento.id);
+        } catch (erro) {
+          alert(`Não deu para reabrir: ${erro.message}`);
+        }
+      });
+
+      // --- Excluir ---
+      quando('btn-excluir', 'click', async () => {
+        const aviso = orcamento.pedido_id
+          ? `Apagar o orçamento #${orcamento.id}?\n\n` +
+            `O pedido #${orcamento.pedido_id}, que já foi gerado, continua no sistema.\n` +
+            'Só a proposta é apagada. Não tem como desfazer.'
+          : `Apagar o orçamento #${orcamento.id}?\n\nNão tem como desfazer.`;
+        if (!confirm(aviso)) return;
+        try {
+          await window.erpAPI.orcamentos.excluir(orcamento.id);
+          selecionado = null;
+          await carregarLista();
+          detalheEl.innerHTML = `<p class="vazio">Orçamento #${orcamento.id} apagado.</p>`;
+        } catch (erro) {
+          alert(`Não deu para apagar: ${erro.message}`);
+        }
+      });
+
+      // --- Prorrogar validade ---
+      const areaProrrogar = em('area-prorrogar');
+      quando('btn-prorrogar', 'click', async () => {
+        em('nova-validade').value = await window.erpAPI.orcamentos.validadePadrao();
+        areaProrrogar.style.display = 'block';
+      });
+      quando('btn-prorrogar-nao', 'click', () => { areaProrrogar.style.display = 'none'; });
+      quando('btn-prorrogar-sim', 'click', async () => {
+        try {
+          await window.erpAPI.orcamentos.prorrogar(orcamento.id, em('nova-validade').value || null);
+          await carregarLista();
+          selecionar(orcamento.id);
+        } catch (erro) {
+          alert(`Não deu para prorrogar: ${erro.message}`);
+        }
+      });
+
+      // --- Aprovar e gerar pedido ---
+      const areaAprovar = em('area-aprovar');
+      const aPrazo = orcamento.forma_pagamento === 'prazo';
+      let parcelas = [];
+      let intervalo = 30;
+      let meioPagamento = 'dinheiro';
+
+      // Divide o total em centavos exatos; a sobra vai para a última parcela.
+      function dividirValor(total, quantidade) {
+        const base = Math.floor((total * 100) / quantidade) / 100;
+        const valores = Array(quantidade).fill(base);
+        valores[quantidade - 1] = +(base + (total - +(base * quantidade).toFixed(2))).toFixed(2);
+        return valores;
+      }
+
+      function gerarParcelas() {
+        const quantidade = Math.max(1, Math.min(24, Number(em('qtd-parcelas').value) || 1));
+        parcelas = dividirValor(orcamento.total, quantidade).map((valor, i) => {
+          const d = new Date();
+          d.setDate(d.getDate() + intervalo * (i + 1));
+          return { vencimento: dataISO(d), valor };
+        });
+        em('linhas-parcelas').innerHTML = parcelas.map((p, i) => `
+          <tr>
+            <td>${i + 1} de ${parcelas.length}</td>
+            <td><input type="date" class="venc-parcela" data-i="${i}" value="${p.vencimento}"
+                       style="padding:0.3rem 0.4rem; font-size:0.85rem;"></td>
+            <td class="num" style="font-weight:700;">${real(p.valor)}</td>
+          </tr>`).join('');
+      }
+
+      if (aPrazo && areaAprovar) {
+        em('qtd-parcelas').addEventListener('input', gerarParcelas);
+        em('linhas-parcelas').addEventListener('change', (e) => {
+          if (e.target.classList.contains('venc-parcela')) {
+            parcelas[Number(e.target.dataset.i)].vencimento = e.target.value;
+          }
+        });
+        areaAprovar.querySelectorAll('.atalhos-prazo button').forEach(botao => {
+          botao.addEventListener('click', () => {
+            intervalo = Number(botao.dataset.intervalo);
+            areaAprovar.querySelectorAll('.atalhos-prazo button')
+              .forEach(b => b.classList.remove('escolhido'));
+            botao.classList.add('escolhido');
+            gerarParcelas();
+          });
+        });
+      } else if (areaAprovar) {
+        areaAprovar.querySelectorAll('.meio-pagamento button').forEach(botao => {
+          botao.addEventListener('click', () => {
+            areaAprovar.querySelectorAll('.meio-pagamento button')
+              .forEach(b => b.classList.remove('escolhido'));
+            botao.classList.add('escolhido');
+            meioPagamento = botao.dataset.meio;
+          });
+        });
+      }
+
+      quando('btn-aprovar', 'click', () => {
+        areaAprovar.style.display = 'block';
+        if (aPrazo) gerarParcelas();
+      });
+      quando('btn-aprovar-nao', 'click', () => { areaAprovar.style.display = 'none'; });
+
+      quando('btn-aprovar-sim', 'click', async (ev) => {
+        const botao = ev.target;
+        botao.disabled = true;
+        try {
+          const r = await window.erpAPI.orcamentos.converterEmPedido(orcamento.id, {
+            parcelas: aPrazo ? parcelas : null,
+            meioPagamento: aPrazo ? null : meioPagamento
+          });
+          await carregarLista();
+          await selecionar(orcamento.id);
+          alert(
+            `Orçamento #${r.orcamento_id} aprovado.\n\n` +
+            `Virou o pedido #${r.pedido_id}. As peças saíram do estoque` +
+            (aPrazo ? ' e as parcelas estão em “A receber”.' : '.')
+          );
+        } catch (erro) {
+          alert(`Não deu para gerar o pedido:\n${erro.message}`);
+          botao.disabled = false;
+        }
+      });
+    }
+
+    // ---------- Início ----------
+    limparFormulario();
+    buscaEl.focus();
+  </script>
+</body>
+</html>

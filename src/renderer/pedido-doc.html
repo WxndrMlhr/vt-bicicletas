@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Pedido</title>
+  <link rel="stylesheet" href="documento.css">
+</head>
+<body>
+  <header class="topo">
+    <div class="marca">
+      <img src="logo.png" class="logo" alt="VT Bicicletas">
+      <div class="loja-dados">
+        O seu fornecedor completo de peças<br>
+        R. Antônio Pacheco, 40 — Carmari<br>
+        Nova Iguaçu / RJ — Tel: (21) 98332-0678
+      </div>
+    </div>
+    <div class="selo-doc">
+      <div class="rotulo">Pedido</div>
+      <div class="numero" id="numero">#0000</div>
+      <div class="datas" id="datas">—</div>
+    </div>
+  </header>
+
+  <main class="corpo">
+    <h2>Cliente</h2>
+    <div class="painel" id="cliente"></div>
+
+    <div class="nota-cancelado oculto" id="nota-cancelado"></div>
+
+    <h2>Itens</h2>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 9mm;">#</th>
+          <th class="item">Peça</th>
+          <th class="num" style="width: 16mm;">Qtd</th>
+          <th class="num" style="width: 26mm;">Unitário</th>
+          <th class="num" style="width: 28mm;">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody id="itens"></tbody>
+    </table>
+
+    <div class="fecho">
+      <div class="caixa">
+        <div class="parcial" id="qtd-pecas">—</div>
+        <div class="total">
+          <span class="rotulo">Total</span>
+          <span class="valor" id="total">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="nota-2k oculto" id="nota-2k">
+      Preço de retirada aplicado — em compras acima de R$ 2.000,00 à vista, a entrega é por nossa conta.
+    </div>
+
+    <!-- Pagamento à esquerda, parcelas à direita. Num pedido à vista
+         a coluna das parcelas some e o pagamento ocupa a folha toda. -->
+    <div class="colunas">
+      <section class="bloco">
+        <h2>Pagamento</h2>
+        <div class="condicoes">
+          <ul id="pagamento"></ul>
+        </div>
+      </section>
+
+      <section class="bloco oculto" id="bloco-parcelas">
+        <h2>Parcelas</h2>
+        <table class="parcelas">
+          <thead>
+            <tr>
+              <th style="width: 20mm;">Parcela</th>
+              <th style="width: 26mm;">Vence em</th>
+              <th class="num" style="width: 26mm;">Valor</th>
+              <th style="width: 20mm;">Situação</th>
+            </tr>
+          </thead>
+          <tbody id="linhas-parcelas"></tbody>
+        </table>
+      </section>
+    </div>
+  </main>
+
+  <footer class="fim">
+    <div class="assinaturas">
+      <div>
+        <div class="risco">V.T. Bicicletas</div>
+        <div class="papel">Responsável pela entrega</div>
+      </div>
+      <div>
+        <div class="risco" id="assinatura-cliente">Cliente</div>
+        <div class="papel">Recebi as peças conferidas</div>
+      </div>
+    </div>
+
+    <div class="rodape">
+      Este documento é um comprovante de pedido e não tem valor fiscal.<br>
+      V.T. Bicicletas — Nova Iguaçu / RJ — (21) 98332-0678
+    </div>
+  </footer>
+
+  <script>
+    const real = v => (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    const escapar = t => String(t ?? '').replace(/[<>&"]/g,
+      c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+
+    const nomesForma = {
+      balcao: 'Balcão (varejo)',
+      prazo: 'A prazo',
+      vista: 'À vista',
+      vista_retirada: 'À vista com retirada em loja'
+    };
+    const nomesMeio = { dinheiro: 'Dinheiro / Pix', cartao: 'Cartão' };
+
+    function dia(texto) {
+      if (!texto) return '—';
+      const [a, m, d] = texto.slice(0, 10).split('-');
+      return `${d}/${m}/${a}`;
+    }
+    function dataHora(texto) {
+      if (!texto) return '—';
+      const [data, hora] = texto.split(' ');
+      return dia(data) + (hora ? ` às ${hora.slice(0, 5)}` : '');
+    }
+    function mostrar(id, condicao) {
+      document.getElementById(id).classList.toggle('oculto', !condicao);
+    }
+
+    window.erpAPI.aoReceberDocumento((pedido) => {
+      const itens = pedido.itens || [];
+      const parcelas = pedido.parcelas || [];
+
+      document.getElementById('numero').textContent =
+        '#' + String(pedido.id ?? 0).padStart(4, '0');
+      document.getElementById('datas').textContent = dataHora(pedido.criado_em);
+
+      const contato = [pedido.telefone, pedido.endereco].filter(Boolean);
+      document.getElementById('cliente').innerHTML = pedido.cliente
+        ? `<div class="nome">${escapar(pedido.cliente)}</div>
+           ${contato.length ? `<div class="linha">${contato.map(escapar).join(' · ')}</div>` : ''}`
+        : '<div class="nome vazio">Consumidor</div>';
+
+      if (pedido.cliente) {
+        document.getElementById('assinatura-cliente').textContent = pedido.cliente;
+      }
+
+      // Pedido cancelado continua podendo ser impresso — mas a folha precisa
+      // dizer isso com todas as letras, para não circular como venda válida.
+      mostrar('nota-cancelado', !!pedido.cancelado);
+      if (pedido.cancelado) {
+        document.getElementById('nota-cancelado').innerHTML = `
+          <strong>PEDIDO CANCELADO</strong> em ${dataHora(pedido.cancelado_em)}.
+          ${pedido.motivo_cancelamento ? `<br>Motivo: ${escapar(pedido.motivo_cancelamento)}` : ''}
+          <div class="detalhe">
+            As peças voltaram ao estoque e as cobranças em aberto foram retiradas.
+            Este documento serve apenas como registro.
+          </div>`;
+      }
+
+      document.getElementById('itens').innerHTML = itens.map((i, n) => `
+        <tr>
+          <td class="ordem">${n + 1}</td>
+          <td class="item">${escapar(i.nome)}</td>
+          <td class="num">${i.quantidade}</td>
+          <td class="num">${real(i.preco_unitario)}</td>
+          <td class="num">${real(i.subtotal)}</td>
+        </tr>`).join('');
+
+      const pecas = itens.reduce((s, i) => s + i.quantidade, 0);
+      document.getElementById('qtd-pecas').textContent =
+        `${itens.length} ${itens.length === 1 ? 'item' : 'itens'} · ${pecas} ${pecas === 1 ? 'peça' : 'peças'}`;
+      document.getElementById('total').textContent = real(pedido.total);
+
+      mostrar('nota-2k', pedido.total >= 2000 && pedido.forma_pagamento === 'vista');
+
+      // --- Pagamento ---
+      const linhas = [
+        `<strong>Forma:</strong> ${nomesForma[pedido.forma_pagamento] || pedido.forma_pagamento}`
+      ];
+      if (pedido.meio_pagamento) {
+        linhas.push(`<strong>Recebido em:</strong> ${nomesMeio[pedido.meio_pagamento] || pedido.meio_pagamento}`);
+      }
+      if (pedido.forma_pagamento === 'prazo') {
+        const emAberto = parcelas.filter(p => !p.pago);
+        const valorAberto = emAberto.reduce((s, p) => s + p.valor, 0);
+        linhas.push(parcelas.length > 1
+          ? `<strong>Parcelamento:</strong> ${parcelas.length}x`
+          : '<strong>Parcelamento:</strong> pagamento único');
+        linhas.push(emAberto.length === 0 && parcelas.length > 0
+          ? '<strong>Situação:</strong> tudo quitado'
+          : `<strong>Em aberto:</strong> ${real(valorAberto)} em ${emAberto.length} ${emAberto.length === 1 ? 'cobrança' : 'cobranças'}`);
+      } else {
+        linhas.push('<strong>Situação:</strong> pago no ato');
+      }
+      document.getElementById('pagamento').innerHTML = linhas.map(t => `<li>${t}</li>`).join('');
+
+      // --- Parcelas ---
+      mostrar('bloco-parcelas', parcelas.length > 0 && pedido.forma_pagamento === 'prazo');
+      document.getElementById('linhas-parcelas').innerHTML = parcelas.map((p, n) => `
+        <tr>
+          <td class="ordem">${p.total_parcelas > 1 ? `${p.parcela}/${p.total_parcelas}` : n + 1}</td>
+          <td>${p.vencimento ? dia(p.vencimento) : 'a combinar'}</td>
+          <td class="num">${real(p.valor)}</td>
+          <td class="${p.pago ? 'paga' : 'aberta'}">${p.pago ? 'Paga' : 'Em aberto'}</td>
+        </tr>`).join('');
+
+      const pronto = () => window.erpAPI.documentoPronto();
+      const logo = document.querySelector('.logo');
+      if (logo && !logo.complete) {
+        logo.addEventListener('load', pronto, { once: true });
+        logo.addEventListener('error', pronto, { once: true });
+      } else {
+        pronto();
+      }
+    });
+  </script>
+</body>
+</html>

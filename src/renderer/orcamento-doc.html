@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Orçamento</title>
+  <link rel="stylesheet" href="documento.css">
+</head>
+<body>
+  <header class="topo">
+    <div class="marca">
+      <img src="logo.png" class="logo" alt="VT Bicicletas">
+      <div class="loja-dados">
+        O seu fornecedor completo de peças<br>
+        R. Antônio Pacheco, 40 — Carmari<br>
+        Nova Iguaçu / RJ — Tel: (21) 98332-0678
+      </div>
+    </div>
+    <div class="selo-doc">
+      <div class="rotulo">Orçamento</div>
+      <div class="numero" id="numero">#0000</div>
+      <div class="datas">
+        Emitido em <span id="emissao">—</span><br>
+        <span class="validade">Válido até <span id="validade">—</span></span>
+      </div>
+    </div>
+  </header>
+
+  <main class="corpo">
+    <h2>Cliente</h2>
+    <div class="painel" id="cliente"></div>
+
+    <h2>Itens</h2>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 9mm;">#</th>
+          <th class="item">Peça</th>
+          <th class="num" style="width: 16mm;">Qtd</th>
+          <th class="num" style="width: 26mm;">Unitário</th>
+          <th class="num" style="width: 28mm;">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody id="itens"></tbody>
+    </table>
+
+    <div class="fecho">
+      <div class="caixa">
+        <div class="parcial" id="qtd-pecas">—</div>
+        <div class="total">
+          <span class="rotulo">Total</span>
+          <span class="valor" id="total">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="nota-2k oculto" id="nota-2k">
+      Preço de retirada aplicado — em compras acima de R$ 2.000,00 à vista, a entrega é por nossa conta.
+    </div>
+
+    <!-- Condições e observações lado a lado: aproveita a largura da folha
+         e deixa o miolo do documento mais compacto. -->
+    <div class="colunas">
+      <section class="bloco">
+        <h2>Condições</h2>
+        <div class="condicoes">
+          <ul id="condicoes"></ul>
+        </div>
+      </section>
+
+      <section class="bloco oculto" id="bloco-obs">
+        <h2>Observações</h2>
+        <div class="obs" id="observacoes"></div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="fim">
+    <div class="assinaturas">
+      <div>
+        <div class="risco">V.T. Bicicletas</div>
+        <div class="papel">Responsável pelo orçamento</div>
+      </div>
+      <div>
+        <div class="risco" id="assinatura-cliente">Cliente</div>
+        <div class="papel">Aceite do cliente</div>
+      </div>
+    </div>
+
+    <div class="rodape">
+      Este documento é um orçamento e não tem valor fiscal.<br>
+      V.T. Bicicletas — Nova Iguaçu / RJ — (21) 98332-0678
+    </div>
+  </footer>
+
+  <script>
+    const real = v => (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    const escapar = t => String(t ?? '').replace(/[<>&"]/g,
+      c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+
+    const nomesForma = {
+      balcao: 'Balcão (varejo)',
+      prazo: 'A prazo',
+      vista: 'À vista',
+      vista_retirada: 'À vista com retirada em loja'
+    };
+
+    // 'AAAA-MM-DD' ou 'AAAA-MM-DD HH:MM:SS' -> 'DD/MM/AAAA'
+    function dia(texto) {
+      if (!texto) return '—';
+      const [a, m, d] = texto.slice(0, 10).split('-');
+      return `${d}/${m}/${a}`;
+    }
+
+    function mostrar(id, condicao) {
+      document.getElementById(id).classList.toggle('oculto', !condicao);
+    }
+
+    window.erpAPI.aoReceberDocumento((orcamento) => {
+      const itens = orcamento.itens || [];
+
+      document.getElementById('numero').textContent =
+        '#' + String(orcamento.id ?? 0).padStart(4, '0');
+      document.getElementById('emissao').textContent = dia(orcamento.criado_em);
+      document.getElementById('validade').textContent = dia(orcamento.validade);
+
+      // Ficha do cliente. Sem cadastro, o documento sai como "Consumidor",
+      // que é o caso do atendimento de balcão.
+      const contato = [orcamento.telefone, orcamento.endereco].filter(Boolean);
+      document.getElementById('cliente').innerHTML = orcamento.cliente
+        ? `<div class="nome">${escapar(orcamento.cliente)}</div>
+           ${contato.length ? `<div class="linha">${contato.map(escapar).join(' · ')}</div>` : ''}`
+        : '<div class="nome vazio">Consumidor</div>';
+
+      if (orcamento.cliente) {
+        document.getElementById('assinatura-cliente').textContent = orcamento.cliente;
+      }
+
+      document.getElementById('itens').innerHTML = itens.map((i, n) => `
+        <tr>
+          <td class="ordem">${n + 1}</td>
+          <td class="item">${escapar(i.nome)}</td>
+          <td class="num">${i.quantidade}</td>
+          <td class="num">${real(i.preco_unitario)}</td>
+          <td class="num">${real(i.subtotal)}</td>
+        </tr>`).join('');
+
+      const pecas = itens.reduce((s, i) => s + i.quantidade, 0);
+      document.getElementById('qtd-pecas').textContent =
+        `${itens.length} ${itens.length === 1 ? 'item' : 'itens'} · ${pecas} ${pecas === 1 ? 'peça' : 'peças'}`;
+      document.getElementById('total').textContent = real(orcamento.total);
+
+      // A regra dos R$ 2.000 vale só para pagamento à vista.
+      mostrar('nota-2k', orcamento.total >= 2000 && orcamento.forma_pagamento === 'vista');
+
+      const temObs = !!(orcamento.observacoes && orcamento.observacoes.trim());
+      mostrar('bloco-obs', temObs);
+      if (temObs) document.getElementById('observacoes').textContent = orcamento.observacoes.trim();
+
+      document.getElementById('condicoes').innerHTML = [
+        `<strong>Forma de pagamento:</strong> ${nomesForma[orcamento.forma_pagamento] || orcamento.forma_pagamento}`,
+        `<strong>Validade da proposta:</strong> ${dia(orcamento.validade)} — depois dessa data os preços podem mudar.`,
+        'Os valores dependem da disponibilidade das peças na aprovação. Este orçamento não reserva estoque nem gera cobrança enquanto não for aprovado.'
+      ].map(t => `<li>${t}</li>`).join('');
+
+      // As imagens precisam estar carregadas antes de virar PDF,
+      // senão o logo sai em branco na folha.
+      const pronto = () => window.erpAPI.documentoPronto();
+      const logo = document.querySelector('.logo');
+      if (logo && !logo.complete) {
+        logo.addEventListener('load', pronto, { once: true });
+        logo.addEventListener('error', pronto, { once: true });
+      } else {
+        pronto();
+      }
+    });
+  </script>
+</body>
+</html>

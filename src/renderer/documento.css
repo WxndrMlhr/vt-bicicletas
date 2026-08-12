@@ -1,0 +1,222 @@
+/* ============================================================
+   Documento de folha A4 — usado pelo orçamento e pelo pedido.
+   As medidas são em mm de propósito: o que aparece na tela é o
+   que sai no papel. A margem da folha é definida aqui, e não
+   pelo Electron (veja documento-pdf.js).
+   ============================================================ */
+
+@page { size: A4; margin: 12mm 14mm; }
+
+* { box-sizing: border-box; }
+
+/* A folha é uma coluna: miolo elástico e fecho preso embaixo.
+   Sem isso, num documento curto o rodapé fica boiando no meio da página
+   e sobra um vazio grande no pé. O min-height é a altura útil do A4
+   (297mm menos as margens), com uma folga de 1mm para o arredondamento
+   da impressão não empurrar uma segunda página em branco. */
+body {
+  margin: 0;
+  font-family: 'Segoe UI', system-ui, Arial, sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.42;
+  color: #16191F;
+  background: #fff;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  display: flex;
+  flex-direction: column;
+  min-height: 272mm;
+}
+
+.corpo { flex: 1 0 auto; }
+.fim { margin-top: auto; flex-shrink: 0; }
+
+/* Duas colunas lado a lado. Se um dos lados estiver escondido,
+   o outro ocupa a largura toda sozinho. */
+.colunas { display: flex; gap: 7mm; align-items: flex-start; }
+.colunas > section { flex: 1; min-width: 0; }
+
+.num { font-family: 'Consolas', 'Courier New', monospace; text-align: right; white-space: nowrap; }
+.oculto { display: none; }
+.bloco { page-break-inside: avoid; }
+
+/* ---------- Cabeçalho ----------
+   Faixa baixa e larga: a marca à esquerda, o número do documento à direita.
+   Quanto menos altura ela ocupa, mais itens cabem na primeira folha. */
+.topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8mm;
+  border-bottom: 2.5pt solid #16191F;
+  padding-bottom: 3mm;
+}
+.topo .marca { display: flex; align-items: center; gap: 5mm; }
+.topo .logo { width: 32mm; height: auto; display: block; flex-shrink: 0; }
+.topo .loja-dados { font-size: 8.4pt; color: #5C6675; line-height: 1.45; }
+
+.selo-doc { text-align: right; flex-shrink: 0; }
+.selo-doc .rotulo {
+  font-size: 8.5pt;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #5C6675;
+}
+.selo-doc .numero {
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 21pt;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #16191F;
+}
+.selo-doc .datas { font-size: 8.6pt; color: #5C6675; margin-top: 1mm; }
+.selo-doc .validade { font-weight: 600; color: #16191F; }
+
+/* ---------- Seções e painéis ---------- */
+h2 {
+  font-size: 8.5pt;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #5C6675;
+  font-weight: 600;
+  margin: 3.5mm 0 1.5mm;
+}
+
+.painel {
+  border: 0.8pt solid #DFE3E8;
+  border-left: 2.5pt solid #FF7500;
+  border-radius: 1mm;
+  padding: 2.5mm 3.5mm;
+  background: #FAFBFC;
+}
+.painel .nome { font-size: 12pt; font-weight: 600; }
+.painel .linha { font-size: 9.4pt; color: #333A45; margin-top: 0.8mm; }
+.painel .vazio { color: #8A93A0; font-style: italic; }
+
+/* ---------- Itens ---------- */
+table { width: 100%; border-collapse: collapse; }
+
+thead th {
+  font-size: 8.4pt;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #fff;
+  background: #16191F;
+  font-weight: 600;
+  text-align: left;
+  padding: 2mm 2.5mm;
+}
+thead th.num { text-align: right; }
+
+tbody td {
+  padding: 1.5mm 2.5mm;
+  border-bottom: 0.5pt solid #DFE3E8;
+  font-size: 9.8pt;
+  vertical-align: top;
+}
+tbody tr:nth-child(even) td { background: #F7F8F9; }
+td.item { width: 100%; }
+td.ordem { color: #8A93A0; font-family: 'Consolas', monospace; font-size: 9pt; }
+
+/* Não deixa uma linha ser partida entre duas páginas */
+tr { page-break-inside: avoid; }
+thead { display: table-header-group; }
+
+/* ---------- Fecho ---------- */
+.fecho {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2.5mm;
+  page-break-inside: avoid;
+}
+.fecho .caixa { min-width: 78mm; }
+.fecho .parcial {
+  text-align: right;
+  font-size: 9.4pt;
+  color: #5C6675;
+  padding: 0 3mm 0.5mm;
+}
+.fecho .total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  background: #16191F;
+  color: #fff;
+  padding: 2.4mm 3mm;
+  border-radius: 1mm;
+  margin-top: 1.2mm;
+}
+.fecho .total .rotulo {
+  font-size: 9pt;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #AAB2BD;
+}
+.fecho .total .valor {
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 17pt;
+  font-weight: 700;
+}
+
+/* ---------- Avisos ---------- */
+.nota-2k {
+  background: #FCF6E4;
+  border: 0.8pt solid #E8D08C;
+  border-radius: 1mm;
+  padding: 2mm 3mm;
+  font-size: 8.8pt;
+  color: #7A5A00;
+  margin-top: 2.5mm;
+}
+
+.nota-cancelado {
+  background: #FBEFE9;
+  border: 0.8pt solid #E8BBA6;
+  border-left: 2.5pt solid #C2410C;
+  border-radius: 1mm;
+  padding: 2.5mm 3.5mm;
+  font-size: 9.2pt;
+  color: #C2410C;
+  margin-top: 3mm;
+}
+.nota-cancelado .detalhe { color: #5C6675; font-size: 8.6pt; margin-top: 0.8mm; }
+
+.obs {
+  border: 0.8pt solid #DFE3E8;
+  border-radius: 1mm;
+  padding: 2.5mm 3.5mm;
+  font-size: 9.4pt;
+  white-space: pre-wrap;
+  background: #FAFBFC;
+}
+
+.condicoes { font-size: 9pt; color: #333A45; }
+.condicoes li { margin-bottom: 0.6mm; }
+.condicoes ul { margin: 0; padding-left: 5mm; }
+
+/* ---------- Parcelas (pedido a prazo) ---------- */
+.parcelas { width: auto; min-width: 88mm; }
+.parcelas thead th { padding: 1.5mm 2.5mm; }
+.parcelas tbody td { font-size: 9.4pt; }
+.parcelas .paga { color: #1F7A4D; font-weight: 600; }
+.parcelas .aberta { color: #5C6675; }
+
+/* ---------- Assinaturas e rodapé ---------- */
+.assinaturas {
+  display: flex;
+  gap: 14mm;
+  margin-top: 10mm;
+  page-break-inside: avoid;
+}
+.assinaturas div { flex: 1; text-align: center; }
+.assinaturas .risco { border-top: 0.8pt solid #16191F; padding-top: 1.5mm; }
+.assinaturas .papel { font-size: 8.6pt; color: #5C6675; }
+
+.rodape {
+  margin-top: 5mm;
+  padding-top: 2mm;
+  border-top: 0.8pt solid #DFE3E8;
+  text-align: center;
+  font-size: 8.2pt;
+  color: #5C6675;
+}

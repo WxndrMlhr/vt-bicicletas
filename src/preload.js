@@ -37,12 +37,41 @@ contextBridge.exposeInMainWorld('erpAPI', {
     listar: () => ipcRenderer.invoke('pedidos:listar'),
     buscar: (id) => ipcRenderer.invoke('pedidos:buscar', id),
     cancelar: (id, motivo) => ipcRenderer.invoke('pedidos:cancelar', id, motivo),
-    excluir: (id) => ipcRenderer.invoke('pedidos:excluir', id)
+    excluir: (id) => ipcRenderer.invoke('pedidos:excluir', id),
+    // Via em folha A4 (PDF ou impressora comum), separada do cupom térmico.
+    salvarPDF: (id, opcoes) => ipcRenderer.invoke('pedidos:pdf', id, opcoes),
+    imprimirA4: (id, opcoes) => ipcRenderer.invoke('pedidos:imprimirA4', id, opcoes),
+    abrirPastaPDF: () => ipcRenderer.invoke('pedidos:abrirPastaPDF')
+  },
+
+  orcamentos: {
+    calcular: (itens, forma) => ipcRenderer.invoke('orcamentos:calcular', itens, forma),
+    salvar: (dados) => ipcRenderer.invoke('orcamentos:salvar', dados),
+    atualizar: (id, dados) => ipcRenderer.invoke('orcamentos:atualizar', id, dados),
+    listar: (filtro) => ipcRenderer.invoke('orcamentos:listar', filtro),
+    buscar: (id) => ipcRenderer.invoke('orcamentos:buscar', id),
+    definirSituacao: (id, situacao) => ipcRenderer.invoke('orcamentos:situacao', id, situacao),
+    prorrogar: (id, validade) => ipcRenderer.invoke('orcamentos:prorrogar', id, validade),
+    converterEmPedido: (id, opcoes) => ipcRenderer.invoke('orcamentos:converter', id, opcoes),
+    excluir: (id) => ipcRenderer.invoke('orcamentos:excluir', id),
+    resumo: () => ipcRenderer.invoke('orcamentos:resumo'),
+    validadePadrao: () => ipcRenderer.invoke('orcamentos:validadePadrao'),
+    salvarPDF: (id, opcoes) => ipcRenderer.invoke('orcamentos:pdf', id, opcoes),
+    imprimir: (id, opcoes) => ipcRenderer.invoke('orcamentos:imprimir', id, opcoes),
+    abrirPasta: () => ipcRenderer.invoke('orcamentos:abrirPasta')
   },
 
   impressao: {
     imprimir: (pedidoId, opcoes) => ipcRenderer.invoke('impressao:imprimir', pedidoId, opcoes),
-    listarImpressoras: () => ipcRenderer.invoke('impressao:listar')
+    listarImpressoras: () => ipcRenderer.invoke('impressao:listar'),
+    papeis: (nomeImpressora) => ipcRenderer.invoke('impressao:papeis', nomeImpressora),
+    teste: (opcoes) => ipcRenderer.invoke('impressao:teste', opcoes)
+  },
+
+  config: {
+    tudo: () => ipcRenderer.invoke('config:tudo'),
+    salvar: (dados) => ipcRenderer.invoke('config:salvar', dados),
+    restaurar: () => ipcRenderer.invoke('config:restaurar')
   },
 
   relatorios: {

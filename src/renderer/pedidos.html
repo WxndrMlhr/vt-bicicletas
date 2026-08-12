@@ -161,10 +161,11 @@
         </div>
       </div>
 
-      <div class="acoes" style="align-items: center; height: 100%;">
+      <div class="acoes" style="align-items: center; height: 100%; flex-wrap: wrap;">
         <button class="neutro" id="btn-limpar">Limpar</button>
         <button class="neutro" id="btn-salvar">Só salvar</button>
-        <button id="btn-imprimir">Salvar e imprimir</button>
+        <button class="neutro" id="btn-pdf">Salvar e baixar PDF</button>
+        <button id="btn-imprimir">Salvar e imprimir cupom</button>
       </div>
     </div>
   </main>
@@ -496,11 +497,30 @@
       limparTudo();
     });
 
+    // Baixa a via do pedido em folha A4, para arquivar, mandar para o cliente
+    // ou imprimir numa impressora comum. O cupom da mini impressora continua
+    // no botão ao lado.
+    document.getElementById('btn-pdf').addEventListener('click', async (ev) => {
+      const botao = ev.target;
+      const id = await salvarPedidoAtual();
+      if (!id) return;
+      botao.disabled = true;
+      botao.textContent = 'Gerando...';
+      try {
+        await window.erpAPI.pedidos.salvarPDF(id, { abrirDepois: true });
+      } catch (erro) {
+        alert(`Pedido #${id} foi salvo, mas o PDF falhou:\n${erro.message}`);
+      }
+      botao.disabled = false;
+      botao.textContent = 'Salvar e baixar PDF';
+      limparTudo();
+    });
+
     document.getElementById('btn-imprimir').addEventListener('click', async () => {
       const id = await salvarPedidoAtual();
       if (!id) return;
       try {
-        await window.erpAPI.impressao.imprimir(id, { silencioso: false });
+        await window.erpAPI.impressao.imprimir(id);
       } catch (erro) {
         alert(`Pedido #${id} foi salvo, mas a impressão falhou:\n${erro.message}`);
       }

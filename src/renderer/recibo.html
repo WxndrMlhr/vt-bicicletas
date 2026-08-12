@@ -4,12 +4,17 @@
   <meta charset="UTF-8">
   <title>Recibo</title>
   <style>
-    /* LARGURA DO PAPEL
-       Mini impressoras costumam ser 58mm ou 80mm.
-       Se o cupom sair cortado ou muito estreito, troque o valor abaixo. */
-    :root { --largura-papel: 72mm; }  /* use ~48mm para papel de 58mm */
+    /* LARGURA ÚTIL DE IMPRESSÃO — não é a largura do papel.
+       Papel de 80mm imprime ~72mm; papel de 58mm imprime ~48mm.
+       Isso vem da tela de Configurações; o valor aqui é só o de segurança
+       para o caso de a configuração não chegar. */
+    :root { --largura-papel: 72mm; }
 
     @page { margin: 0; }
+
+    /* Sem isto, o recuo de 2mm de cada lado somava na largura e o corpo
+       saía com 76mm em vez de 72mm — o que corta o cupom na direita. */
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -119,7 +124,12 @@
     };
 
     // O processo principal envia os dados do pedido por aqui.
-    window.erpAPI.aoReceberRecibo((pedido) => {
+    window.erpAPI.aoReceberRecibo((pedido, opcoes) => {
+      // Largura útil de impressão, vinda da tela de Configurações.
+      if (opcoes && opcoes.larguraMM > 0) {
+        document.documentElement.style.setProperty('--largura-papel', `${opcoes.larguraMM}mm`);
+      }
+
       const data = new Date(pedido.criado_em || Date.now());
       const dataTexto = data.toLocaleString('pt-BR', {
         day: '2-digit', month: '2-digit', year: 'numeric',

@@ -3,13 +3,15 @@
   const paginas = [
     { arquivo: 'balcao.html',     rotulo: 'Balcão' },
     { arquivo: 'pedidos.html',    rotulo: 'Pedido atacado' },
+    { arquivo: 'orcamentos.html', rotulo: 'Orçamentos' },
     { arquivo: 'historico.html',  rotulo: 'Pedidos' },
     { arquivo: 'clientes.html',   rotulo: 'Clientes' },
     { arquivo: 'produtos.html',   rotulo: 'Produtos' },
     { arquivo: 'estoque.html',    rotulo: 'Estoque' },
     { arquivo: 'financeiro.html', rotulo: 'A receber' },
     { arquivo: 'relatorios.html', rotulo: 'Relatórios' },
-    { arquivo: 'backup.html',     rotulo: 'Backup' }
+    { arquivo: 'backup.html',     rotulo: 'Backup' },
+    { arquivo: 'configuracoes.html', rotulo: 'Configurações' }
   ];
 
   const atual = location.pathname.split('/').pop() || 'pedidos.html';

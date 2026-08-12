@@ -185,6 +185,47 @@ db.exec(`
   );
 `);
 
+// Configurações do sistema, em chave/valor.
+// É aqui que ficam os dados da loja e os ajustes de impressão — coisas que
+// mudam de instalação para instalação e por isso não podem morar no código.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS configuracoes (
+    chave TEXT PRIMARY KEY,
+    valor TEXT
+  );
+`);
+
+// Orçamento é proposta, não venda: não mexe em estoque nem abre cobrança.
+// Fica guardado com os preços do dia em que foi feito, porque é isso que
+// foi prometido ao cliente. Quando ele aprova, vira pedido de verdade.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS orcamentos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cliente TEXT,
+    cliente_id INTEGER,
+    telefone TEXT,
+    forma_pagamento TEXT NOT NULL,
+    total REAL NOT NULL,
+    validade TEXT,                              -- data ISO (AAAA-MM-DD)
+    observacoes TEXT,
+    situacao TEXT NOT NULL DEFAULT 'aberto',    -- aberto | aprovado | recusado
+    pedido_id INTEGER,                          -- preenchido quando vira pedido
+    criado_em TEXT DEFAULT (datetime('now','localtime')),
+    FOREIGN KEY (pedido_id) REFERENCES pedidos(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS orcamento_itens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    orcamento_id INTEGER NOT NULL,
+    produto_id INTEGER,
+    nome TEXT NOT NULL,
+    quantidade INTEGER NOT NULL,
+    preco_unitario REAL NOT NULL,
+    subtotal REAL NOT NULL,
+    FOREIGN KEY (orcamento_id) REFERENCES orcamentos(id)
+  );
+`);
+
 // Migrações: adiciona colunas novas em bancos que já existiam,
 // sem apagar nada do que já está gravado.
 function garantirColuna(tabela, coluna, definicao) {
@@ -206,52 +247,16 @@ garantirColuna('pedidos', 'meio_pagamento', 'TEXT');
 garantirColuna('contas_receber', 'parcela', 'INTEGER');
 garantirColuna('contas_receber', 'total_parcelas', 'INTEGER');
 
-// Carrega automaticamente a tabela de preços da VT Bicicletas.
-// Só insere os itens que ainda não existem (compara pelo nome),
-// então pode rodar toda vez que o app abre, sem duplicar nada.
-const { itens: itensIniciais, categorizar } = require('./dados-iniciais');
+// Tabela de preços que vem junto com o programa.
+// Roda uma vez só: banco que já tem produtos não é tocado, e banco novo
+// recebe a carga inicial. Ver catalogo-inicial.js.
+const catalogoInicial = require('./catalogo-inicial');
+const cargaInicial = catalogoInicial.naAbertura(db);
 
-const existePorNome = db.prepare('SELECT 1 FROM produtos WHERE nome = ?');
-const inserirProduto = db.prepare(`
-  INSERT INTO produtos (nome, categoria, preco_prazo, preco_vista, preco_vista_retirada)
-  VALUES (?, ?, ?, ?, ?)
-`);
-
-const carregarIniciais = db.transaction(() => {
-  let novos = 0;
-  for (const [nome, prazo, vista, retirada] of itensIniciais) {
-    if (!existePorNome.get(nome)) {
-      inserirProduto.run(nome, categorizar(nome), prazo, vista, retirada);
-      novos++;
-    }
-  }
-  return novos;
-});
-
-const novosProdutos = carregarIniciais();
-if (novosProdutos > 0) {
-  console.log(`[VT Bicicletas] ${novosProdutos} produtos da tabela de preços carregados.`);
-}
-
-// Preços de balcão (varejo). Só preenche onde ainda está vazio,
-// para não sobrescrever valor que o usuário tenha ajustado no app.
-const { precosBalcao } = require('./dados-balcao');
-const definirBalcao = db.prepare(
-  'UPDATE produtos SET preco_balcao = ? WHERE nome = ? AND preco_balcao IS NULL'
-);
-
-const carregarBalcao = db.transaction(() => {
-  let preenchidos = 0;
-  for (const [nome, preco] of precosBalcao) {
-    const r = definirBalcao.run(preco, nome);
-    if (r.changes > 0) preenchidos++;
-  }
-  return preenchidos;
-});
-
-const novosBalcao = carregarBalcao();
-if (novosBalcao > 0) {
-  console.log(`[VT Bicicletas] ${novosBalcao} preços de balcão carregados.`);
+if (cargaInicial.acao === 'semeado') {
+  console.log(`[VT Bicicletas] Instalação nova: ${cargaInicial.novos} produtos e ${cargaInicial.balcao} preços de balcão carregados.`);
+} else if (cargaInicial.acao === 'marcado') {
+  console.log(`[VT Bicicletas] ${cargaInicial.produtos} produtos já cadastrados; carga inicial dispensada.`);
 }
 
 module.exports = db;

@@ -138,6 +138,9 @@
 
           <button class="botao-finalizar" id="btn-finalizar">Finalizar e imprimir</button>
           <div style="display: flex; gap: 0.5rem; margin-top: 0.6rem;">
+            <button class="neutro" id="btn-pdf" style="flex: 1;">Finalizar e baixar PDF</button>
+          </div>
+          <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
             <button class="neutro" id="btn-so-salvar" style="flex: 1;">Sem imprimir</button>
             <button class="neutro" id="btn-limpar" style="flex: 1;">Limpar</button>
           </div>
@@ -328,7 +331,8 @@
       buscaEl.focus();
     }
 
-    async function finalizar(imprimir) {
+    // saida: 'cupom' (mini impressora), 'pdf' (via em folha A4) ou 'nada'
+    async function finalizar(saida) {
       if (!ultimoCalculo || itens.length === 0) {
         alert('Adicione pelo menos uma peça.');
         return;
@@ -343,11 +347,17 @@
         total
       });
 
-      if (imprimir) {
+      if (saida === 'cupom') {
         try {
-          await window.erpAPI.impressao.imprimir(id, { silencioso: false });
+          await window.erpAPI.impressao.imprimir(id);
         } catch (erro) {
           alert(`Venda #${id} registrada, mas a impressão falhou:\n${erro.message}`);
+        }
+      } else if (saida === 'pdf') {
+        try {
+          await window.erpAPI.pedidos.salvarPDF(id, { abrirDepois: true });
+        } catch (erro) {
+          alert(`Venda #${id} registrada, mas o PDF falhou:\n${erro.message}`);
         }
       } else {
         alert(`Venda #${id} registrada. Total ${real(total)}.`);
@@ -355,9 +365,18 @@
       limpar();
     }
 
-    document.getElementById('btn-finalizar').addEventListener('click', () => finalizar(true));
-    document.getElementById('btn-so-salvar').addEventListener('click', () => finalizar(false));
+    document.getElementById('btn-finalizar').addEventListener('click', () => finalizar('cupom'));
+    document.getElementById('btn-so-salvar').addEventListener('click', () => finalizar('nada'));
     document.getElementById('btn-limpar').addEventListener('click', limpar);
+
+    document.getElementById('btn-pdf').addEventListener('click', async (ev) => {
+      const botao = ev.target;
+      botao.disabled = true;
+      botao.textContent = 'Gerando...';
+      await finalizar('pdf');
+      botao.disabled = false;
+      botao.textContent = 'Finalizar e baixar PDF';
+    });
 
     recalcular();
     buscaEl.focus();

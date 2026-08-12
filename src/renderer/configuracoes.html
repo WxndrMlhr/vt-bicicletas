@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Configurações — VT Bicicletas</title>
+  <link rel="stylesheet" href="estilo.css">
+  <style>
+    .larguras { display: flex; gap: 0.5rem; }
+    .larguras button {
+      flex: 1;
+      background: var(--branco);
+      border: 1px solid var(--aco-100);
+      color: var(--aco-700);
+      text-align: left;
+      padding: 0.6rem 0.8rem;
+      line-height: 1.3;
+    }
+    .larguras button.escolhido {
+      background: var(--aco-900);
+      color: var(--branco);
+      border-color: var(--aco-900);
+    }
+    .larguras .medida { display: block; font-size: 0.75rem; opacity: 0.75; font-weight: 400; }
+
+    .interruptor {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+      padding: 0.7rem 0;
+    }
+    .interruptor input { width: auto; margin-top: 0.15rem; flex-shrink: 0; }
+    .interruptor .texto { font-size: 0.87rem; }
+    .interruptor .apoio { color: var(--aco-500); font-size: 0.8rem; margin-top: 0.15rem; }
+
+    .detectado {
+      display: none;
+      background: #EDF6F1;
+      border: 1px solid #B7D9C7;
+      border-left: 3px solid var(--verde);
+      border-radius: var(--raio);
+      padding: 0.6rem 0.8rem;
+      font-size: 0.83rem;
+      margin-top: 0.6rem;
+    }
+    .detectado.vazio { background: var(--papel); border-color: var(--aco-100); border-left-color: var(--aco-300); }
+    .detectado .lista { color: var(--aco-500); font-size: 0.78rem; margin-top: 0.3rem; word-break: break-word; }
+
+    .barra-salvar {
+      position: sticky;
+      bottom: 0;
+      background: var(--papel);
+      border-top: 1px solid var(--aco-100);
+      padding: 0.9rem 0;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      justify-content: flex-end;
+      margin-top: 0.4rem;
+    }
+    .aviso-salvo { color: var(--verde); font-size: 0.85rem; font-weight: 600; margin-right: auto; display: none; }
+  </style>
+</head>
+<body>
+  <script src="menu.js"></script>
+
+  <main class="conteudo">
+    <h1 class="titulo-pagina">Configurações</h1>
+    <p class="subtitulo-pagina">Ajustes da loja e da impressora. Valem para todos os cupons e documentos.</p>
+
+    <div class="grade-2">
+      <section>
+        <div class="cartao">
+          <h2 class="secao">Dados da loja</h2>
+          <div class="linha-campos c2">
+            <div>
+              <label class="campo" for="loja_nome">Nome da loja</label>
+              <input type="text" id="loja_nome" data-config>
+            </div>
+            <div>
+              <label class="campo" for="loja_telefone">Telefone</label>
+              <input type="text" id="loja_telefone" data-config>
+            </div>
+          </div>
+          <div style="margin-bottom: 0.9rem;">
+            <label class="campo" for="loja_lema">Lema (linha embaixo do nome)</label>
+            <input type="text" id="loja_lema" data-config>
+          </div>
+          <div class="linha-campos c2">
+            <div>
+              <label class="campo" for="loja_endereco">Endereço</label>
+              <input type="text" id="loja_endereco" data-config>
+            </div>
+            <div>
+              <label class="campo" for="loja_cidade">Cidade / UF</label>
+              <input type="text" id="loja_cidade" data-config>
+            </div>
+          </div>
+          <div>
+            <label class="campo" for="loja_documento">CNPJ / CPF (opcional)</label>
+            <input type="text" id="loja_documento" data-config>
+          </div>
+          <div style="font-size:0.8rem; color:var(--aco-500); margin-top:0.7rem;">
+            Estes dados ficam guardados no banco. Os papéis ainda usam o texto fixo —
+            ligá-los a esta configuração é o passo seguinte, quando você for adaptar
+            o sistema para outras lojas.
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="cartao">
+          <h2 class="secao">Impressora do cupom</h2>
+
+          <div style="margin-bottom: 0.9rem;">
+            <label class="campo" for="impressao_impressora">Impressora</label>
+            <select id="impressao_impressora" data-config></select>
+            <div style="font-size:0.8rem; color:var(--aco-500); margin-top:0.35rem;">
+              Deixe em “Perguntar / usar a padrão do Windows” se você troca de impressora.
+            </div>
+          </div>
+
+          <label class="campo">Largura do papel</label>
+          <div class="larguras" id="larguras">
+            <button type="button" data-mm="48">
+              Papel 58mm
+              <span class="medida">imprime 48mm</span>
+            </button>
+            <button type="button" data-mm="72">
+              Papel 80mm
+              <span class="medida">imprime 72mm</span>
+            </button>
+            <button type="button" data-mm="" id="btn-outra">
+              Outra
+              <span class="medida" id="rotulo-outra">definir</span>
+            </button>
+          </div>
+          <div id="bloco-outra" style="display:none; margin-top:0.6rem;">
+            <label class="campo" for="largura-manual">Largura útil de impressão (mm)</label>
+            <input type="number" id="largura-manual" min="20" max="200" step="1">
+          </div>
+
+          <div style="margin-top:0.7rem;">
+            <button class="neutro mini" id="btn-detectar">Detectar pelo driver</button>
+          </div>
+          <div class="detectado" id="detectado"></div>
+
+          <div class="interruptor" style="margin-top:0.5rem;">
+            <input type="checkbox" id="impressao_silenciosa">
+            <div class="texto">
+              Imprimir direto, sem perguntar
+              <div class="apoio">
+                Pula a janela de impressão do Windows. Mais rápido no balcão,
+                mas exige que a impressora acima esteja certa.
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:0.6rem;">
+            <button class="neutro" id="btn-teste">Imprimir página de teste</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="barra-salvar">
+      <span class="aviso-salvo" id="aviso-salvo">Configurações salvas.</span>
+      <button class="neutro" id="btn-restaurar">Restaurar padrões</button>
+      <button id="btn-salvar">Salvar</button>
+    </div>
+  </main>
+
+  <script>
+    const escapar = t => String(t ?? '').replace(/[<>&"]/g,
+      c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+
+    const impressoraEl = document.getElementById('impressao_impressora');
+    const silenciosaEl = document.getElementById('impressao_silenciosa');
+    const largurasEl = document.getElementById('larguras');
+    const blocoOutraEl = document.getElementById('bloco-outra');
+    const larguraManualEl = document.getElementById('largura-manual');
+    const detectadoEl = document.getElementById('detectado');
+    const avisoSalvoEl = document.getElementById('aviso-salvo');
+
+    let larguraMM = 72;
+
+    // ---------- Largura ----------
+    function marcarLargura(mm) {
+      larguraMM = Number(mm) || 72;
+      const padrao = [48, 72].includes(larguraMM);
+      largurasEl.querySelectorAll('button').forEach(b => {
+        b.classList.toggle('escolhido',
+          padrao ? Number(b.dataset.mm) === larguraMM : b.id === 'btn-outra');
+      });
+      blocoOutraEl.style.display = padrao ? 'none' : 'block';
+      document.getElementById('rotulo-outra').textContent = padrao ? 'definir' : `${larguraMM}mm`;
+      if (!padrao) larguraManualEl.value = larguraMM;
+    }
+
+    largurasEl.addEventListener('click', (e) => {
+      const botao = e.target.closest('button');
+      if (!botao) return;
+      if (botao.id === 'btn-outra') {
+        marcarLargura(Number(larguraManualEl.value) || 60);
+        larguraManualEl.focus();
+      } else {
+        marcarLargura(botao.dataset.mm);
+      }
+    });
+
+    larguraManualEl.addEventListener('input', () => {
+      const n = Number(larguraManualEl.value);
+      if (n >= 20 && n <= 200) larguraMM = n;
+    });
+
+    // ---------- Impressoras ----------
+    async function carregarImpressoras(escolhida) {
+      let lista = [];
+      try {
+        lista = await window.erpAPI.impressao.listarImpressoras();
+      } catch (e) {
+        lista = [];
+      }
+      impressoraEl.innerHTML =
+        '<option value="">Perguntar / usar a padrão do Windows</option>' +
+        lista.map(i => `
+          <option value="${escapar(i.name)}">
+            ${escapar(i.displayName || i.name)}${i.isDefault ? ' (padrão)' : ''}
+          </option>`).join('');
+      // Impressora salva que não está mais instalada continua na lista,
+      // senão salvar de novo apagaria a escolha sem avisar.
+      if (escolhida && !lista.some(i => i.name === escolhida)) {
+        impressoraEl.insertAdjacentHTML('beforeend',
+          `<option value="${escapar(escolhida)}">${escapar(escolhida)} (não encontrada agora)</option>`);
+      }
+      impressoraEl.value = escolhida || '';
+    }
+
+    document.getElementById('btn-detectar').addEventListener('click', async (ev) => {
+      const botao = ev.target;
+      const nome = impressoraEl.value;
+      if (!nome) {
+        detectadoEl.className = 'detectado vazio';
+        detectadoEl.textContent = 'Escolha uma impressora acima para o Windows poder consultar o driver dela.';
+        detectadoEl.style.display = 'block';
+        return;
+      }
+      botao.disabled = true;
+      botao.textContent = 'Consultando...';
+      try {
+        const r = await window.erpAPI.impressao.papeis(nome);
+        if (r.sugestaoMM) {
+          marcarLargura(r.sugestaoMM);
+          detectadoEl.className = 'detectado';
+          detectadoEl.innerHTML =
+            `<strong>Detectado: ${r.sugestaoMM}mm de área de impressão.</strong> Já deixei marcado — confira antes de salvar.` +
+            `<div class="lista">O driver informou: ${escapar(r.papeis.slice(0, 6).join(' · '))}</div>`;
+        } else {
+          detectadoEl.className = 'detectado vazio';
+          detectadoEl.innerHTML = r.papeis.length
+            ? `<strong>Não deu para deduzir a largura.</strong> O driver não informa a medida no nome do papel; escolha na mão acima.` +
+              `<div class="lista">O driver informou: ${escapar(r.papeis.slice(0, 8).join(' · '))}</div>`
+            : '<strong>O driver não informou tamanhos de papel.</strong> Escolha a largura na mão acima.';
+        }
+        detectadoEl.style.display = 'block';
+      } catch (erro) {
+        detectadoEl.className = 'detectado vazio';
+        detectadoEl.textContent = `Não deu para consultar: ${erro.message}`;
+        detectadoEl.style.display = 'block';
+      }
+      botao.disabled = false;
+      botao.textContent = 'Detectar pelo driver';
+    });
+
+    // ---------- Teste ----------
+    document.getElementById('btn-teste').addEventListener('click', async (ev) => {
+      const botao = ev.target;
+      botao.disabled = true;
+      botao.textContent = 'Imprimindo...';
+      try {
+        // Usa o que está na tela agora, mesmo sem salvar — a ideia é testar antes.
+        await window.erpAPI.impressao.teste({
+          larguraMM,
+          nomeImpressora: impressoraEl.value,
+          silencioso: silenciosaEl.checked
+        });
+      } catch (erro) {
+        alert(`Não deu para imprimir o teste:\n${erro.message}`);
+      }
+      botao.disabled = false;
+      botao.textContent = 'Imprimir página de teste';
+    });
+
+    // ---------- Carregar / salvar ----------
+    async function carregar() {
+      const c = await window.erpAPI.config.tudo();
+      document.querySelectorAll('input[data-config]').forEach(el => {
+        el.value = c[el.id] ?? '';
+      });
+      silenciosaEl.checked = c.impressao_silenciosa === '1';
+      marcarLargura(c.impressao_largura_mm);
+      await carregarImpressoras(c.impressao_impressora);
+    }
+
+    function mostrarSalvo() {
+      avisoSalvoEl.style.display = 'inline';
+      setTimeout(() => { avisoSalvoEl.style.display = 'none'; }, 2500);
+    }
+
+    document.getElementById('btn-salvar').addEventListener('click', async (ev) => {
+      const botao = ev.target;
+      botao.disabled = true;
+      const dados = {};
+      document.querySelectorAll('input[data-config]').forEach(el => {
+        dados[el.id] = el.value.trim();
+      });
+      dados.impressao_impressora = impressoraEl.value;
+      dados.impressao_silenciosa = silenciosaEl.checked ? '1' : '0';
+      dados.impressao_largura_mm = String(larguraMM);
+      try {
+        await window.erpAPI.config.salvar(dados);
+        mostrarSalvo();
+      } catch (erro) {
+        alert(`Não deu para salvar: ${erro.message}`);
+      }
+      botao.disabled = false;
+    });
+
+    document.getElementById('btn-restaurar').addEventListener('click', async () => {
+      if (!confirm('Voltar todas as configurações para os valores de fábrica?')) return;
+      await window.erpAPI.config.restaurar();
+      await carregar();
+      mostrarSalvo();
+    });
+
+    carregar();
+  </script>
+</body>
+</html>
