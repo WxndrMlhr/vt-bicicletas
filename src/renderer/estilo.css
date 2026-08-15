@@ -328,6 +328,21 @@ tr.selecionada td { border-bottom-color: #D3DFEC; }
 .sugestao:hover { background: #F7F8F9; }
 .sugestao .apoio { color: var(--aco-500); font-family: var(--face-numero); font-size: 0.8rem; }
 
+/* ---------- Faixa de rascunho recuperado ---------- */
+.faixa-rascunho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  background: #FCF6E4;
+  border: 1px solid #E8D08C;
+  border-left: 3px solid var(--ambar-alto);
+  border-radius: var(--raio);
+  padding: 0.6rem 0.85rem;
+  font-size: 0.86rem;
+  margin-bottom: 1.1rem;
+}
+
 /* ---------- Filtros em linha ---------- */
 .filtros { display: flex; gap: 0.7rem; align-items: flex-end; flex-wrap: wrap; }
 .filtros > div { min-width: 130px; }

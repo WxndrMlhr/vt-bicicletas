@@ -1,6 +1,6 @@
 {
   "name": "vt-bicicletas",
-  "version": "1.6.1",
+  "version": "1.7.0",
   "description": "Sistema de gestão da VT Bicicletas: orçamentos, pedidos, produtos, estoque, clientes, contas a receber e relatórios.",
   "main": "src/main.js",
   "author": "VT Bicicletas",

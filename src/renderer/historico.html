@@ -156,6 +156,7 @@
         <div class="acoes" style="margin-top: 1.1rem; flex-wrap: wrap;">
           <button class="perigo mini" id="btn-excluir">Excluir</button>
           ${pedido.cancelado ? '' : '<button class="neutro mini" id="btn-cancelar">Cancelar pedido</button>'}
+          ${pedido.cancelado ? '' : '<button class="neutro mini" id="btn-editar">Editar pedido</button>'}
           <button class="neutro mini" id="btn-pdf">Baixar PDF</button>
           <button id="btn-imprimir">Imprimir cupom</button>
         </div>
@@ -186,6 +187,15 @@
           } catch (erro) {
             alert(`Não deu para cancelar: ${erro.message}`);
           }
+        });
+      }
+
+      // Venda de balcão é atendimento rápido, já fechado e impresso; editar
+      // por lá não faz sentido. A edição acontece na tela de pedido atacado.
+      const botaoEditar = document.getElementById('btn-editar');
+      if (botaoEditar) {
+        botaoEditar.addEventListener('click', () => {
+          location.href = `pedidos.html?editar=${pedido.id}`;
         });
       }
 

@@ -53,9 +53,22 @@ src/
 ├── impressao.js         envio do cupom para a impressora do sistema
 ├── backup.js            cópias automáticas do banco, com rotação e restauração
 └── renderer/            telas (HTML), estilo compartilhado e imagens
+    └── tela-pedido.js   peças comuns do balcão, do atacado e do orçamento
 ```
 
 ## Regras de negócio
+
+**Pedido em montagem não se perde.** Sair da tela de venda para cadastrar uma
+peça em Produtos e voltar não zera o que já estava montado: o balcão, o pedido
+atacado e o orçamento guardam o rascunho e o repõem quando a tela reabre, com
+uma faixa avisando e um botão para descartar. O rascunho vale por 12 horas.
+
+**Pedido salvo pode ser editado.** Em Pedidos, o botão "Editar pedido" reabre a
+venda na tela de atacado. Gravar substitui o pedido no mesmo número: as peças da
+versão anterior voltam ao estoque, as novas são baixadas e as cobranças em
+aberto são refeitas. Parcela já paga não é mexida — o dinheiro entrou de
+verdade, então ela é preservada e o que sobra a cobrar é o total novo menos o
+que já foi pago. Pedido cancelado não pode ser editado.
 
 **Três preços por peça.** Cada produto tem valor a prazo, à vista, e à vista com
 retirada em loja. A forma de pagamento escolhida no pedido define qual é usado.

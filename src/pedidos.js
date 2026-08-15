@@ -141,6 +141,116 @@ function salvarPedido({ cliente, cliente_id, formaPagamento, linhas, total, venc
   return transacao();
 }
 
+// Regrava um pedido que já estava salvo.
+//
+// Editar não é criar outro pedido: o número é o mesmo, e o que mudou tem de
+// valer também no estoque e no que o cliente deve. Por isso a versão antiga é
+// desfeita antes da nova entrar — as peças voltam para a prateleira e as
+// cobranças em aberto são refeitas.
+//
+// Parcela já paga não é tocada: o dinheiro entrou de verdade. Ela continua
+// como está e o que sobra a cobrar é o total novo menos o que já foi pago.
+function atualizarPedido(id, { cliente, cliente_id, formaPagamento, linhas, total, meioPagamento, parcelas }) {
+  const estoque = require('./estoque');
+  const financeiro = require('./financeiro');
+
+  const inserirItem = db.prepare(`
+    INSERT INTO pedido_itens (pedido_id, produto_id, nome, quantidade, preco_unitario, subtotal)
+    VALUES (@pedido_id, @produto_id, @nome, @quantidade, @preco_unitario, @subtotal)
+  `);
+
+  const transacao = db.transaction(() => {
+    const pedido = db.prepare('SELECT * FROM pedidos WHERE id = ?').get(id);
+    if (!pedido) throw new Error(`Pedido #${id} não encontrado.`);
+    if (pedido.cancelado) throw new Error(`O pedido #${id} está cancelado e não pode ser editado.`);
+    if (!linhas || linhas.length === 0) throw new Error('O pedido precisa de pelo menos uma peça.');
+
+    // 1) Devolve ao estoque o que a versão anterior tinha baixado.
+    const anteriores = db.prepare('SELECT * FROM pedido_itens WHERE pedido_id = ?').all(id);
+    for (const item of anteriores) {
+      if (!item.produto_id) continue;
+      estoque.registrarMovimentacao({
+        produto_id: item.produto_id,
+        tipo: 'entrada',
+        quantidade: item.quantidade,
+        motivo: `Edição do pedido #${id} — versão anterior`,
+        pedido_id: id
+      });
+    }
+
+    // 2) Troca os itens pelos da versão nova e baixa o estoque de novo.
+    db.prepare('DELETE FROM pedido_itens WHERE pedido_id = ?').run(id);
+    for (const linha of linhas) {
+      inserirItem.run({
+        pedido_id: id,
+        produto_id: linha.produto_id,
+        nome: linha.nome,
+        quantidade: linha.quantidade,
+        preco_unitario: linha.preco_unitario,
+        subtotal: linha.subtotal
+      });
+    }
+    estoque.baixarPedido(id, linhas);
+
+    db.prepare(`
+      UPDATE pedidos
+      SET cliente = ?, cliente_id = ?, forma_pagamento = ?, total = ?, meio_pagamento = ?
+      WHERE id = ?
+    `).run(
+      cliente || null, cliente_id || null, formaPagamento, total,
+      meioPagamento || pedido.meio_pagamento || null, id
+    );
+
+    // 3) Cobranças.
+    const contas = db.prepare('SELECT * FROM contas_receber WHERE pedido_id = ?').all(id);
+    const pagas = contas.filter(c => c.pago);
+    const jaPago = +pagas.reduce((soma, c) => soma + c.valor, 0).toFixed(2);
+    db.prepare('DELETE FROM contas_receber WHERE pedido_id = ? AND pago = 0').run(id);
+
+    let avisoConta = null;
+
+    if (formaPagamento === 'prazo') {
+      const aCobrar = +(total - jaPago).toFixed(2);
+
+      if (aCobrar > 0) {
+        const pedidas = (parcelas && parcelas.length > 0)
+          ? parcelas
+          : [{ vencimento: null, valor: aCobrar }];
+
+        // Com parcela paga no meio, os valores pedidos pela tela não fecham
+        // mais com o que falta: o restante é redividido pelas datas escolhidas.
+        const valores = pagas.length > 0
+          ? financeiro.dividirEmParcelas(aCobrar, pedidas.length)
+          : pedidas.map(p => p.valor);
+
+        pedidas.forEach((parcela, i) => {
+          financeiro.criarConta({
+            pedido_id: id,
+            cliente_id: cliente_id || null,
+            cliente_nome: cliente || null,
+            valor: valores[i],
+            vencimento: parcela.vencimento || null,
+            parcela: pagas.length + i + 1,
+            total_parcelas: pagas.length + pedidas.length
+          });
+        });
+      }
+
+      if (pagas.length > 0) {
+        avisoConta = aCobrar > 0
+          ? `${pagas.length} ${pagas.length === 1 ? 'parcela já paga (R$' : 'parcelas já pagas (R$'} ${jaPago.toFixed(2)}) ${pagas.length === 1 ? 'foi mantida' : 'foram mantidas'}. As cobranças em aberto foram refeitas sobre os R$ ${aCobrar.toFixed(2)} que faltam.`
+          : `O pedido já tem R$ ${jaPago.toFixed(2)} pagos, valor igual ou maior que o total novo (R$ ${total.toFixed(2)}). Nenhuma cobrança em aberto foi criada — confira o financeiro para acertar a diferença.`;
+      }
+    } else if (pagas.length > 0) {
+      avisoConta = `Esse pedido deixou de ser a prazo, mas ${pagas.length === 1 ? 'uma parcela já paga continua' : `${pagas.length} parcelas já pagas continuam`} registrada${pagas.length === 1 ? '' : 's'} (R$ ${jaPago.toFixed(2)}). Confira o financeiro.`;
+    }
+
+    return { pedido_id: id, avisoConta };
+  });
+
+  return transacao();
+}
+
 // Cancela um pedido desfazendo tudo que ele causou:
 // devolve as peças ao estoque e remove a conta a receber em aberto.
 // O pedido não é apagado — fica marcado como cancelado, para o histórico
@@ -279,6 +389,7 @@ function buscarPedido(id) {
 module.exports = {
   calcularPedido,
   salvarPedido,
+  atualizarPedido,
   cancelarPedido,
   excluirPedido,
   listarPedidos,

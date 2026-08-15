@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Balcão — VT Bicicletas</title>
   <link rel="stylesheet" href="estilo.css">
+  <script src="tela-pedido.js"></script>
   <style>
     /* Tela de atendimento: campos maiores, menos coisa na frente,
        pensada para vender rápido com o cliente esperando. */
@@ -155,6 +156,10 @@
     let meioPagamento = 'dinheiro';
     let cacheProdutos = null;
     let indiceSugestao = -1;
+    let sequenciaCalculo = 0;    // descarta resposta de cálculo que chegou fora de ordem
+    let restaurando = false;     // enquanto repõe o rascunho, não grava por cima dele
+
+    const rascunho = TelaPedido.criarRascunho('balcao');
 
     const buscaEl = document.getElementById('busca');
     const sugEl = document.getElementById('sugestoes');
@@ -236,6 +241,12 @@
     });
 
     // ---------- Itens ----------
+    function celulaNome(l) {
+      return escapar(l.nome) +
+        (l.sem_preco_balcao ? '<br><span class="etiqueta atencao">Sem preço de balcão — usando o à vista</span>' : '') +
+        (l.falta > 0 ? `<br><span class="etiqueta critica">Tem ${l.estoque_atual} em estoque</span>` : '');
+    }
+
     function adicionar(produto_id, nome) {
       const existente = itens.find(i => i.produto_id === produto_id);
       if (existente) existente.quantidade += 1;
@@ -248,7 +259,17 @@
       recalcular();
     }
 
+    // Guarda a venda em montagem, para ela sobreviver à troca de tela.
+    function guardarRascunho() {
+      if (restaurando) return;
+      const cliente = document.getElementById('cliente').value;
+      if (itens.length === 0 && !cliente.trim()) { rascunho.limpar(); return; }
+      rascunho.salvar({ itens, cliente, meioPagamento });
+    }
+
     async function recalcular() {
+      guardarRascunho();
+
       if (itens.length === 0) {
         itensEl.innerHTML = '<tr><td colspan="5" class="vazio">Comece digitando o nome da peça acima.</td></tr>';
         totalEl.textContent = real(0);
@@ -258,25 +279,32 @@
         return;
       }
 
+      // Guarda de ordem: com o recálculo sendo assíncrono, uma resposta antiga
+      // pode chegar depois de uma nova e escrever número velho na tela.
+      const meuPedido = ++sequenciaCalculo;
       const r = await window.erpAPI.pedidos.calcular(
         itens.map(({ produto_id, quantidade }) => ({ produto_id, quantidade })),
         'balcao'
       );
+      if (meuPedido !== sequenciaCalculo) return;
       ultimoCalculo = r;
 
-      itensEl.innerHTML = r.linhas.map(l => `
-        <tr>
-          <td>
-            ${escapar(l.nome)}
-            ${l.sem_preco_balcao ? '<br><span class="etiqueta atencao">Sem preço de balcão — usando o à vista</span>' : ''}
-            ${l.falta > 0 ? `<br><span class="etiqueta critica">Tem ${l.estoque_atual} em estoque</span>` : ''}
-          </td>
-          <td class="num"><input type="number" class="qtd" min="1" value="${l.quantidade}" data-id="${l.produto_id}"></td>
-          <td class="num">${real(l.preco_unitario)}</td>
-          <td class="num" style="font-weight:700;">${real(l.subtotal)}</td>
-          <td><button class="perigo mini" data-remover="${l.produto_id}">Tirar</button></td>
-        </tr>
-      `).join('');
+      TelaPedido.pintarItens(itensEl, r.linhas, {
+        vazio: '<tr><td colspan="5" class="vazio">Comece digitando o nome da peça acima.</td></tr>',
+        montarLinha: l => `
+          <tr data-linha="${l.produto_id}">
+            <td data-c="nome">${celulaNome(l)}</td>
+            <td class="num"><input type="number" class="qtd" min="1" value="${l.quantidade}" data-id="${l.produto_id}"></td>
+            <td class="num" data-c="unitario">${real(l.preco_unitario)}</td>
+            <td class="num" data-c="subtotal" style="font-weight:700;">${real(l.subtotal)}</td>
+            <td><button class="perigo mini" data-remover="${l.produto_id}">Tirar</button></td>
+          </tr>`,
+        celulas: l => ({
+          nome: celulaNome(l),
+          unitario: real(l.preco_unitario),
+          subtotal: real(l.subtotal)
+        })
+      });
 
       totalEl.textContent = real(r.total);
 
@@ -302,10 +330,31 @@
       }
     }
 
+    function alterarQuantidade(produto_id, quantidade) {
+      const item = itens.find(i => i.produto_id === produto_id);
+      if (item) { item.quantidade = Math.max(1, quantidade); recalcular(); }
+    }
+
+    // Quantidade digitada: atualiza enquanto escreve, com uma pausa curta para
+    // não recalcular a cada tecla. Campo vazio no meio da digitação é ignorado —
+    // virar 1 na marra atrapalha quem está apagando para trocar o número.
+    let tQtd;
+    itensEl.addEventListener('input', (e) => {
+      if (!e.target.classList.contains('qtd')) return;
+      const id = Number(e.target.dataset.id);
+      const escrito = e.target.value;
+      if (escrito === '') return;
+      clearTimeout(tQtd);
+      tQtd = setTimeout(() => alterarQuantidade(id, Number(escrito)), 250);
+    });
+
+    // Ao sair do campo (ou usar as setinhas), arruma o que ficou inválido.
     itensEl.addEventListener('change', (e) => {
       if (!e.target.classList.contains('qtd')) return;
-      const item = itens.find(i => i.produto_id === Number(e.target.dataset.id));
-      if (item) { item.quantidade = Math.max(1, Number(e.target.value) || 1); recalcular(); }
+      clearTimeout(tQtd);
+      const quantidade = Math.max(1, Math.floor(Number(e.target.value) || 1));
+      e.target.value = quantidade;
+      alterarQuantidade(Number(e.target.dataset.id), quantidade);
     });
 
     itensEl.addEventListener('click', (e) => {
@@ -319,14 +368,18 @@
         document.querySelectorAll('.meio-pagamento button').forEach(b => b.classList.remove('escolhido'));
         botao.classList.add('escolhido');
         meioPagamento = botao.dataset.meio;
+        guardarRascunho();
       });
     });
+
+    document.getElementById('cliente').addEventListener('input', guardarRascunho);
 
     // ---------- Finalizar ----------
     function limpar() {
       itens = [];
       cacheProdutos = null;
       document.getElementById('cliente').value = '';
+      rascunho.limpar();
       recalcular();
       buscaEl.focus();
     }
@@ -378,8 +431,28 @@
       botao.textContent = 'Finalizar e baixar PDF';
     });
 
-    recalcular();
-    buscaEl.focus();
+    // ---------- Abertura da tela ----------
+    function iniciar() {
+      const guardado = rascunho.ler();
+      if (guardado && (guardado.itens || []).length > 0) {
+        restaurando = true;
+        itens = guardado.itens;
+        document.getElementById('cliente').value = guardado.cliente || '';
+        meioPagamento = guardado.meioPagamento || 'dinheiro';
+        document.querySelectorAll('.meio-pagamento button').forEach(b => {
+          b.classList.toggle('escolhido', b.dataset.meio === meioPagamento);
+        });
+        restaurando = false;
+        TelaPedido.avisarRascunho(
+          'Voltamos a venda que você estava montando.',
+          () => { rascunho.limpar(); location.reload(); }
+        );
+      }
+      recalcular();
+      buscaEl.focus();
+    }
+
+    iniciar();
   </script>
 </body>
 </html>

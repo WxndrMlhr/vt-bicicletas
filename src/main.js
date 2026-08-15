@@ -80,6 +80,8 @@ ipcMain.handle('pedidos:calcular', (event, itens, forma) =>
 
 ipcMain.handle('pedidos:salvar', (event, dados) => pedidos.salvarPedido(dados));
 
+ipcMain.handle('pedidos:atualizar', (event, id, dados) => pedidos.atualizarPedido(id, dados));
+
 ipcMain.handle('pedidos:listar', () => pedidos.listarPedidos());
 
 ipcMain.handle('pedidos:buscar', (event, id) => pedidos.buscarPedido(id));
