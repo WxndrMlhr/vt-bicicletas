@@ -185,7 +185,7 @@
             if (r.avisoConta) aviso += `\n\nAtenção: ${r.avisoConta}`;
             alert(aviso);
           } catch (erro) {
-            alert(`Não deu para cancelar: ${erro.message}`);
+            alert(`Não deu para cancelar: ${motivo(erro)}`);
           }
         });
       }
@@ -213,7 +213,7 @@
           await carregarLista();
           detalheEl.innerHTML = `<p class="vazio">Pedido #${r.pedido_id} apagado.</p>`;
         } catch (erro) {
-          alert(`Não deu para apagar: ${erro.message}`);
+          alert(`Não deu para apagar: ${motivo(erro)}`);
         }
       });
 
@@ -225,7 +225,7 @@
         try {
           await window.erpAPI.pedidos.salvarPDF(pedido.id, { abrirDepois: true });
         } catch (erro) {
-          alert(`Não deu para gerar o PDF: ${erro.message}`);
+          alert(`Não deu para gerar o PDF: ${motivo(erro)}`);
         }
         botao.disabled = false;
         botao.textContent = 'Baixar PDF';
@@ -238,7 +238,7 @@
         try {
           await window.erpAPI.impressao.imprimir(pedido.id);
         } catch (erro) {
-          alert(`Não deu para imprimir: ${erro.message}`);
+          alert(`Não deu para imprimir: ${motivo(erro)}`);
         }
         botao.disabled = false;
         botao.textContent = 'Imprimir cupom';

@@ -230,7 +230,7 @@
             : '<div class="sugestao" style="color:var(--aco-500)">Nenhuma peça com esse nome.</div>';
           sugProdEl.style.display = 'block';
         } catch (erro) {
-          sugProdEl.innerHTML = `<div class="sugestao" style="color:var(--oxido)">Erro na busca: ${erro.message}</div>`;
+          sugProdEl.innerHTML = `<div class="sugestao" style="color:var(--oxido)">Erro na busca: ${motivo(erro)}</div>`;
           sugProdEl.style.display = 'block';
         }
       }, 180);
@@ -598,22 +598,36 @@
       try {
         await window.erpAPI.pedidos.salvarPDF(id, { abrirDepois: true });
       } catch (erro) {
-        alert(`Pedido #${id} foi salvo, mas o PDF falhou:\n${erro.message}`);
+        alert(`Pedido #${id} foi salvo, mas o PDF falhou:\n${motivo(erro)}`);
       }
       botao.disabled = false;
       botao.textContent = 'Salvar e baixar PDF';
       encerrar();
     });
 
-    document.getElementById('btn-imprimir').addEventListener('click', async () => {
-      const id = await salvarPedidoAtual();
-      if (!id) return;
+    document.getElementById('btn-imprimir').addEventListener('click', async (ev) => {
+      // Travar o botão não é enfeite: dois cliques rápidos abriam dois
+      // diálogos de impressão presos na mesma janela, e o segundo ficava
+      // atrás, invisível, bloqueando o teclado do sistema inteiro. O
+      // processo principal agora recusa o segundo, mas é melhor a pessoa
+      // não conseguir pedir do que receber recusa.
+      const botao = ev.target;
+      const rotulo = botao.textContent;
+      botao.disabled = true;
+      botao.textContent = 'Imprimindo...';
       try {
-        await window.erpAPI.impressao.imprimir(id);
-      } catch (erro) {
-        alert(`Pedido #${id} foi salvo, mas a impressão falhou:\n${erro.message}`);
+        const id = await salvarPedidoAtual();
+        if (!id) return;
+        try {
+          await window.erpAPI.impressao.imprimir(id);
+        } catch (erro) {
+          alert(`Pedido #${id} foi salvo, mas a impressão falhou:\n${motivo(erro)}`);
+        }
+        encerrar();
+      } finally {
+        botao.disabled = false;
+        botao.textContent = rotulo;
       }
-      encerrar();
     });
 
     // ---------- Abertura da tela ----------

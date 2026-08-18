@@ -115,7 +115,7 @@
           try {
             await window.erpAPI.backup.restaurar(arquivo);
           } catch (erro) {
-            alert(`Não deu para restaurar: ${erro.message}`);
+            alert(`Não deu para restaurar: ${motivo(erro)}`);
           }
         });
       });

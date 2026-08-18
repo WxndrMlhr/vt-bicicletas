@@ -264,7 +264,7 @@
         detectadoEl.style.display = 'block';
       } catch (erro) {
         detectadoEl.className = 'detectado vazio';
-        detectadoEl.textContent = `Não deu para consultar: ${erro.message}`;
+        detectadoEl.textContent = `Não deu para consultar: ${motivo(erro)}`;
         detectadoEl.style.display = 'block';
       }
       botao.disabled = false;
@@ -284,7 +284,7 @@
           silencioso: silenciosaEl.checked
         });
       } catch (erro) {
-        alert(`Não deu para imprimir o teste:\n${erro.message}`);
+        alert(`Não deu para imprimir o teste:\n${motivo(erro)}`);
       }
       botao.disabled = false;
       botao.textContent = 'Imprimir página de teste';
@@ -320,7 +320,7 @@
         await window.erpAPI.config.salvar(dados);
         mostrarSalvo();
       } catch (erro) {
-        alert(`Não deu para salvar: ${erro.message}`);
+        alert(`Não deu para salvar: ${motivo(erro)}`);
       }
       botao.disabled = false;
     });

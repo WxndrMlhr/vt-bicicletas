@@ -590,7 +590,7 @@
         }
         return await window.erpAPI.orcamentos.salvar(dados);
       } catch (erro) {
-        alert(`Não deu para salvar o orçamento:\n${erro.message}`);
+        alert(`Não deu para salvar o orçamento:\n${motivo(erro)}`);
         return null;
       }
     }
@@ -671,7 +671,7 @@
         if (r.cancelado) return false;
         return true;
       } catch (erro) {
-        alert(`O orçamento #${id} está salvo, mas o PDF falhou:\n${erro.message}`);
+        alert(`O orçamento #${id} está salvo, mas o PDF falhou:\n${motivo(erro)}`);
         return false;
       } finally {
         if (botao) { botao.disabled = false; botao.textContent = rotulo; }
@@ -892,7 +892,7 @@
         try {
           await window.erpAPI.orcamentos.imprimir(orcamento.id, { silencioso: false });
         } catch (erro) {
-          alert(`Não deu para imprimir: ${erro.message}`);
+          alert(`Não deu para imprimir: ${motivo(erro)}`);
         }
         botao.disabled = false;
         botao.textContent = rotulo;
@@ -908,7 +908,7 @@
           await carregarLista();
           selecionar(orcamento.id);
         } catch (erro) {
-          alert(`Não deu para marcar: ${erro.message}`);
+          alert(`Não deu para marcar: ${motivo(erro)}`);
         }
       });
 
@@ -918,7 +918,7 @@
           await carregarLista();
           selecionar(orcamento.id);
         } catch (erro) {
-          alert(`Não deu para reabrir: ${erro.message}`);
+          alert(`Não deu para reabrir: ${motivo(erro)}`);
         }
       });
 
@@ -936,7 +936,7 @@
           await carregarLista();
           detalheEl.innerHTML = `<p class="vazio">Orçamento #${orcamento.id} apagado.</p>`;
         } catch (erro) {
-          alert(`Não deu para apagar: ${erro.message}`);
+          alert(`Não deu para apagar: ${motivo(erro)}`);
         }
       });
 
@@ -953,7 +953,7 @@
           await carregarLista();
           selecionar(orcamento.id);
         } catch (erro) {
-          alert(`Não deu para prorrogar: ${erro.message}`);
+          alert(`Não deu para prorrogar: ${motivo(erro)}`);
         }
       });
 
@@ -1037,7 +1037,7 @@
             (aPrazo ? ' e as parcelas estão em “A receber”.' : '.')
           );
         } catch (erro) {
-          alert(`Não deu para gerar o pedido:\n${erro.message}`);
+          alert(`Não deu para gerar o pedido:\n${motivo(erro)}`);
           botao.disabled = false;
         }
       });

@@ -13,7 +13,13 @@ function pastaBase() {
   return path.join(__dirname, '..');
 }
 
-const PASTA_DADOS = path.join(pastaBase(), 'dados');
+// O mesmo desvio do db.js, pelo mesmo motivo: sem ele, um teste de backup
+// copiaria e apagaria dentro da pasta da loja de verdade. As duas leituras
+// têm de concordar, senão o backup salvaria um banco e o sistema usaria
+// outro.
+const PASTA_DADOS = process.env.ERP_DADOS
+  ? path.resolve(process.env.ERP_DADOS)
+  : path.join(pastaBase(), 'dados');
 const PASTA_BACKUPS = path.join(PASTA_DADOS, 'backups');
 const ARQUIVO_BANCO = path.join(PASTA_DADOS, 'vtbicicletas.db');
 const MANTER = 30; // quantas cópias guardar

@@ -361,7 +361,7 @@
             await abrirAlteracoes();
             alert(`Pronto. ${r.restaurados} ${r.restaurados === 1 ? 'peça voltou' : 'peças voltaram'} ao preço anterior.`);
           } catch (erro) {
-            alert(`Não deu para desfazer: ${erro.message}`);
+            alert(`Não deu para desfazer: ${motivo(erro)}`);
           }
         });
       });

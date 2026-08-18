@@ -385,37 +385,67 @@
     }
 
     // saida: 'cupom' (mini impressora), 'pdf' (via em folha A4) ou 'nada'
+    // Trava contra clique duplo.
+    //
+    // Sem ela, dois cliques rápidos em "Finalizar e imprimir" gravavam a
+    // venda DUAS VEZES — dois pedidos, estoque baixado duas vezes — porque
+    // o `await` do salvar demora e nada impedia a segunda entrada. Travar
+    // só o botão não bastava: são três botões chamando esta mesma função, e
+    // o teclado também dispara. A trava fica aqui, onde todos passam.
+    let finalizando = false;
+
     async function finalizar(saida) {
+      if (finalizando) return;
       if (!ultimoCalculo || itens.length === 0) {
         alert('Adicione pelo menos uma peça.');
         return;
       }
-      const total = ultimoCalculo.total;
-      const id = await window.erpAPI.pedidos.salvar({
-        cliente: document.getElementById('cliente').value.trim(),
-        cliente_id: null,
-        formaPagamento: 'balcao',
-        meioPagamento,
-        linhas: ultimoCalculo.linhas,
-        total
-      });
 
-      if (saida === 'cupom') {
-        try {
-          await window.erpAPI.impressao.imprimir(id);
-        } catch (erro) {
-          alert(`Venda #${id} registrada, mas a impressão falhou:\n${erro.message}`);
+      finalizando = true;
+      travarBotoes(true);
+      let id = null;
+      try {
+        const total = ultimoCalculo.total;
+        id = await window.erpAPI.pedidos.salvar({
+          cliente: document.getElementById('cliente').value.trim(),
+          cliente_id: null,
+          formaPagamento: 'balcao',
+          meioPagamento,
+          linhas: ultimoCalculo.linhas,
+          total
+        });
+
+        if (saida === 'cupom') {
+          try {
+            await window.erpAPI.impressao.imprimir(id);
+          } catch (erro) {
+            alert(`Venda #${id} registrada, mas a impressão falhou:\n${motivo(erro)}`);
+          }
+        } else if (saida === 'pdf') {
+          try {
+            await window.erpAPI.pedidos.salvarPDF(id, { abrirDepois: true });
+          } catch (erro) {
+            alert(`Venda #${id} registrada, mas o PDF falhou:\n${motivo(erro)}`);
+          }
+        } else {
+          alert(`Venda #${id} registrada. Total ${real(total)}.`);
         }
-      } else if (saida === 'pdf') {
-        try {
-          await window.erpAPI.pedidos.salvarPDF(id, { abrirDepois: true });
-        } catch (erro) {
-          alert(`Venda #${id} registrada, mas o PDF falhou:\n${erro.message}`);
-        }
-      } else {
-        alert(`Venda #${id} registrada. Total ${real(total)}.`);
+        limpar();
+      } catch (erro) {
+        // Falha no SALVAR, que é diferente de falha na impressão: aqui não
+        // há venda nenhuma, e o carrinho não pode ser limpo.
+        alert(`Não deu para registrar a venda:\n${motivo(erro)}`);
+      } finally {
+        finalizando = false;
+        travarBotoes(false);
       }
-      limpar();
+    }
+
+    function travarBotoes(travado) {
+      for (const id of ['btn-finalizar', 'btn-so-salvar', 'btn-pdf']) {
+        const b = document.getElementById(id);
+        if (b) b.disabled = travado;
+      }
     }
 
     document.getElementById('btn-finalizar').addEventListener('click', () => finalizar('cupom'));

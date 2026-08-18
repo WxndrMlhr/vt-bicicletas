@@ -13,20 +13,9 @@ const TEMPO_LIMITE = 20000;
 // tem uma folga bem maior que a montagem do documento.
 const TEMPO_LIMITE_IMPRESSAO = 5 * 60 * 1000;
 
-// A janela que serve de pai para o "Salvar como".
-//
-// Tem de ser uma janela VISÍVEL. As folhas A4 e o cupom são montados em
-// janelas ocultas, e elas aparecem em getAllWindows() enquanto existem —
-// às vezes até na frente da principal. Se o diálogo for preso a uma delas,
-// ele abre invisível: ninguém consegue responder e o app inteiro trava,
-// porque um diálogo modal bloqueia a janela dona.
-//
-// Sem nenhuma janela visível, vale mais abrir o diálogo solto (sem pai)
-// do que arriscar prendê-lo numa janela escondida.
-function janelaVisivel() {
-  return BrowserWindow.getAllWindows()
-    .find(j => !j.isDestroyed() && j.isVisible()) || null;
-}
+// Quem cuida de não deixar dois diálogos do Windows abertos ao mesmo tempo,
+// e de prendê-los sempre numa janela visível. O porquê está lá dentro.
+const dialogos = require('./dialogos');
 
 // Abre a janela oculta, manda os dados e devolve quando a página avisar
 // que terminou de montar. Quem chama é responsável por destruir a janela.
@@ -118,10 +107,9 @@ function criarGerador({ pagina, pasta, titulo, nomeArquivo }) {
         filters: [{ name: 'Documento PDF', extensions: ['pdf'] }],
         properties: ['createDirectory', 'showOverwriteConfirmation']
       };
-      const pai = janelaVisivel();
-      const escolha = pai
-        ? await dialog.showSaveDialog(pai, opcoesDialogo)
-        : await dialog.showSaveDialog(opcoesDialogo);
+      const escolha = await dialogos.exclusivo(titulo, (pai) => (pai
+        ? dialog.showSaveDialog(pai, opcoesDialogo)
+        : dialog.showSaveDialog(opcoesDialogo)));
       if (escolha.canceled || !escolha.filePath) return { cancelado: true };
       destino = escolha.filePath;
     }
@@ -155,8 +143,18 @@ function criarGerador({ pagina, pasta, titulo, nomeArquivo }) {
   async function imprimir(dados, {
     silencioso = false, nomeImpressora = '', tempoLimite = TEMPO_LIMITE_IMPRESSAO
   } = {}) {
-    const janela = await prepararDocumento(pagina, dados);
+    const fazer = async () => {
+      const janela = await prepararDocumento(pagina, dados);
+      return mandarParaImpressora(janela, { silencioso, nomeImpressora, tempoLimite });
+    };
 
+    // Impressão silenciosa não abre janela do Windows, então não disputa a
+    // tranca. Com diálogo, disputa: ele é tão modal quanto o "Salvar como",
+    // e dois modais na mesma janela é o que travava o sistema.
+    return silencioso ? fazer() : dialogos.exclusivo(`Imprimir — ${titulo}`, fazer);
+  }
+
+  function mandarParaImpressora(janela, { silencioso, nomeImpressora, tempoLimite }) {
     return new Promise((resolve, reject) => {
       // A margem também vem do @page do documento — 'none' evita
       // que a impressora acrescente a dela por cima.

@@ -2,6 +2,7 @@ const path = require('path');
 const { execFile } = require('child_process');
 const { BrowserWindow } = require('electron');
 const configuracoes = require('./configuracoes');
+const dialogos = require('./dialogos');
 
 const TEMPO_MONTAGEM = 20000;              // montar o cupom
 const TEMPO_IMPRESSAO = 5 * 60 * 1000;     // esperar a resposta do diálogo
@@ -17,6 +18,18 @@ const TEMPO_IMPRESSAO = 5 * 60 * 1000;     // esperar a resposta do diálogo
 function imprimirPedido(pedido, opcoes = {}) {
   const salvo = configuracoes.opcoesDeImpressao();
   const silencioso = opcoes.silencioso ?? salvo.silenciosa;
+
+  // Com diálogo, o cupom disputa a mesma tranca do "Salvar como" e da folha
+  // A4: são todos modais da mesma janela, e dois deles abertos ao mesmo
+  // tempo é o que fazia o sistema parar de aceitar teclado. Silencioso não
+  // abre janela nenhuma, então passa direto.
+  return silencioso
+    ? mandarCupom(pedido, opcoes, salvo, silencioso)
+    : dialogos.exclusivo('Imprimir cupom',
+        () => mandarCupom(pedido, opcoes, salvo, silencioso));
+}
+
+function mandarCupom(pedido, opcoes, salvo, silencioso) {
   const nomeImpressora = opcoes.nomeImpressora ?? salvo.impressora;
   const larguraMM = opcoes.larguraMM ?? salvo.larguraMM;
   // tempoLimite existe para os testes exercitarem a rede de segurança.

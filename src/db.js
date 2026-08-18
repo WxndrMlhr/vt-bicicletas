@@ -17,7 +17,17 @@ function pastaBase() {
   return path.join(__dirname, '..');
 }
 
-const pastaDados = path.join(pastaBase(), 'dados');
+// ERP_DADOS aponta o banco para outro lugar.
+//
+// É o que permite rodar teste sem chegar perto do banco da loja. Sem isto,
+// qualquer script que carregue o sistema abre o vtbicicletas.db de verdade —
+// com os clientes, os pedidos e o estoque lá dentro. Um teste distraído
+// bastaria para estragar o trabalho de meses.
+//
+// Em uso normal a variável não existe e nada muda.
+const pastaDados = process.env.ERP_DADOS
+  ? path.resolve(process.env.ERP_DADOS)
+  : path.join(pastaBase(), 'dados');
 if (!fs.existsSync(pastaDados)) fs.mkdirSync(pastaDados, { recursive: true });
 
 const dbPath = path.join(pastaDados, 'vtbicicletas.db');
