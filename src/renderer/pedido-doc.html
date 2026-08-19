@@ -81,6 +81,26 @@
         </table>
       </section>
     </div>
+
+    <!-- Como o cliente paga a loja. Sai vazio quando não há chave PIX
+         cadastrada em Configurações. -->
+    <section class="pagamento-loja oculto" id="pagamento-loja">
+      <h2>Dados para pagamento</h2>
+      <div class="conteudo">
+        <div class="codigo" id="pix-qr"></div>
+        <div class="campos">
+          <div class="marca-pix">PIX</div>
+          <div><span class="rotulo" id="pix-rotulo-chave">Chave</span><br>
+            <span class="chave" id="pix-chave"></span></div>
+          <div style="margin-top:1.5mm;"><span class="rotulo">Nome</span><br>
+            <span class="valor" id="pix-nome"></span></div>
+          <div style="margin-top:1.5mm;" id="pix-linha-instituicao">
+            <span class="rotulo">Instituição</span><br>
+            <span id="pix-instituicao"></span></div>
+          <div class="recado oculto" id="pix-recado"></div>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer class="fim">
@@ -206,6 +226,25 @@
           <td class="num">${real(p.valor)}</td>
           <td class="${p.pago ? 'paga' : 'aberta'}">${p.pago ? 'Paga' : 'Em aberto'}</td>
         </tr>`).join('');
+
+
+      // --- Dados para pagamento ---
+      // O SVG do QR vem pronto do processo principal: a folha não precisa
+      // saber montar código PIX nem desenhar QR.
+      const pg = pedido.pagamento;
+      mostrar('pagamento-loja', !!pg);
+      if (pg) {
+        document.getElementById('pix-qr').innerHTML = pg.qrGrande;
+        document.getElementById('pix-chave').textContent = pg.chave;
+        document.getElementById('pix-nome').textContent = pg.nome;
+        document.getElementById('pix-rotulo-chave').textContent =
+          'Chave' + (pg.tipoDaChave ? ` (${pg.tipoDaChave})` : '');
+        document.getElementById('pix-instituicao').textContent = pg.instituicao;
+        document.getElementById('pix-linha-instituicao').classList
+          .toggle('oculto', !pg.instituicao);
+        mostrar('pix-recado', !!pg.recado);
+        document.getElementById('pix-recado').textContent = pg.recado;
+      }
 
       const pronto = () => window.erpAPI.documentoPronto();
       const logo = document.querySelector('.logo');

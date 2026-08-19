@@ -23,6 +23,18 @@ const PADROES = {
   impressao_impressora: '',      // vazio = usa a padrão do Windows
   impressao_silenciosa: '0',     // '1' imprime direto, sem o diálogo do Windows
 
+  // --- Dados para pagamento (saem no fim do orçamento, do pedido e do cupom) ---
+  // Ficam aqui, e não escritos nos documentos, para trocar de chave não
+  // depender de mexer no código. Vazio em qualquer um deles faz o bloco
+  // inteiro sumir do papel.
+  pix_chave: '21983320678',
+  // O nome que aparece no aplicativo de quem paga. O padrão do PIX aceita
+  // 25 caracteres, e "Francilene Cascaes Malheiro" tem 27 — por isso o
+  // nome do meio vai abreviado, senão o corte cairia no meio da palavra.
+  pix_nome: 'Francilene C Malheiro',
+  pix_instituicao: 'Mercado Pago',
+  pix_recado: '',                // "avisar no WhatsApp depois de pagar", por exemplo
+
   // --- Controle interno ---
   catalogo_semeado: '0'          // se a tabela de preços inicial já foi carregada
 };

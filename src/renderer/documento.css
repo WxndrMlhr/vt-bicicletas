@@ -220,3 +220,29 @@ thead { display: table-header-group; }
   font-size: 8.2pt;
   color: #5C6675;
 }
+
+/* ---------- Dados para pagamento ----------
+   Fecha o documento: o QR à esquerda e os dados à direita. Fica junto do
+   fecho e não pode partir entre duas folhas — QR cortado ao meio não lê. */
+.pagamento-loja { page-break-inside: avoid; margin-top: 5mm; }
+.pagamento-loja .conteudo {
+  display: flex;
+  align-items: center;
+  gap: 6mm;
+  border: 0.8pt solid #C9CDD4;
+  border-radius: 1.5mm;
+  padding: 3.5mm 4mm;
+}
+.pagamento-loja .codigo { flex-shrink: 0; line-height: 0; }
+.pagamento-loja .codigo svg { width: 30mm; height: 30mm; display: block; }
+.pagamento-loja .campos { font-size: 9.5pt; line-height: 1.5; }
+.pagamento-loja .marca-pix { font-size: 12pt; font-weight: 700; margin-bottom: 1mm; }
+.pagamento-loja .rotulo { color: #5C6675; font-size: 8pt; }
+.pagamento-loja .valor { font-weight: 600; }
+.pagamento-loja .chave {
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-weight: 600;
+}
+.pagamento-loja .recado {
+  margin-top: 2mm; font-size: 8.5pt; color: #5C6675;
+}

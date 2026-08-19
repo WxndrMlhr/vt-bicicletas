@@ -20,6 +20,21 @@ const dialogos = require('./dialogos');
 // Abre a janela oculta, manda os dados e devolve quando a página avisar
 // que terminou de montar. Quem chama é responsável por destruir a janela.
 function prepararDocumento(pagina, dados) {
+  // Os dados de pagamento entram aqui, num lugar só, para o orçamento e o
+  // pedido receberem o mesmo bloco sem cada página ter de montá-lo.
+  //
+  // Carregado por dentro da função e não no topo do arquivo: o
+  // `pagamento` puxa `configuracoes`, que puxa o banco, e exigir banco
+  // aberto só para desenhar uma folha atrapalharia os testes.
+  const comPagamento = { ...dados };
+  try {
+    comPagamento.pagamento = require('./pagamento').dados();
+  } catch (erro) {
+    console.error('[documento] sem bloco de pagamento:', erro.message);
+    comPagamento.pagamento = null;
+  }
+  dados = comPagamento;
+
   return new Promise((resolve, reject) => {
     const janela = new BrowserWindow({
       show: false,

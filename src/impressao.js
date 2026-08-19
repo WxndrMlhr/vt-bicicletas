@@ -90,7 +90,15 @@ function mandarCupom(pedido, opcoes, salvo, silencioso) {
     });
 
     janela.webContents.once('did-finish-load', () => {
-      janela.webContents.send('recibo:dados', pedido, { larguraMM });
+      // O bloco de pagamento vai montado daqui: o cupom não precisa saber
+      // desenhar QR, e o mesmo código serve para a folha A4.
+      let pagamento = null;
+      try {
+        pagamento = require('./pagamento').dados();
+      } catch (erro) {
+        console.error('[impressao] cupom sem bloco de pagamento:', erro.message);
+      }
+      janela.webContents.send('recibo:dados', pedido, { larguraMM, pagamento });
     });
 
     janela.loadFile(path.join(__dirname, 'renderer', 'recibo.html'))

@@ -73,7 +73,26 @@
       font-size: 9.5px;
       margin-top: 8px;
     }
-  </style>
+  
+    /* ---------- PIX ----------
+       O QR precisa cair em numero INTEIRO de pontos da impressora: a
+       termica tem 8 pontos por milimetro, e modulo em fracao de ponto sai
+       borrado — borrado o leitor nao pega. A largura vem calculada de
+       fora, ja arredondada. */
+    .pix { text-align: center; }
+    .risco-pix { border-top: 1px dashed #000; margin: 6px 0; }
+    .pix-titulo { font-weight: bold; font-size: 12px; margin-bottom: 3px; }
+    /* O `auto` nas laterais é o que centraliza: o elemento tem largura
+       fixa em milímetros, e nesse caso o text-align do pai não o move. */
+    .pix-codigo { line-height: 0; margin: 3px auto 4px; }
+    .pix-codigo svg {
+      width: 100%; height: auto; display: block; margin: 0 auto;
+      image-rendering: pixelated;
+    }
+    .pix-nome { font-weight: bold; font-size: 11px; }
+    .pix-linha { font-size: 10px; }
+    .pix-chave { font-family: 'Consolas', monospace; font-size: 10px; }
+</style>
 </head>
 <body>
   <!-- Logo no cupom.
@@ -106,6 +125,17 @@
 
   <div class="aviso" id="aviso"></div>
 
+  <div class="pix" id="pix" style="display:none;">
+    <div class="risco-pix"></div>
+    <div class="pix-titulo">PAGUE COM PIX</div>
+    <div class="pix-codigo" id="pix-codigo"></div>
+    <div class="pix-nome" id="pix-nome"></div>
+    <div class="pix-linha" id="pix-instituicao"></div>
+    <div class="pix-chave" id="pix-chave"></div>
+    <div class="pix-linha" id="pix-recado"></div>
+    <div class="risco-pix"></div>
+  </div>
+
   <div class="rodape">
     Obrigado pela preferência!<br>
     Este documento não é fiscal.
@@ -128,6 +158,21 @@
       // Largura útil de impressão, vinda da tela de Configurações.
       if (opcoes && opcoes.larguraMM > 0) {
         document.documentElement.style.setProperty('--largura-papel', `${opcoes.larguraMM}mm`);
+      }
+
+      // --- PIX ---
+      // A largura do QR e calculada para bater com os pontos da impressora:
+      // 6 pontos por modulo, 8 pontos por milimetro.
+      const pg = opcoes && opcoes.pagamento;
+      if (pg) {
+        const larguraQR = (pg.modulosComMargem * 6) / 8;
+        document.getElementById('pix-codigo').style.width = larguraQR.toFixed(2) + 'mm';
+        document.getElementById('pix-codigo').innerHTML = pg.qrPequeno;
+        document.getElementById('pix-nome').textContent = pg.nome;
+        document.getElementById('pix-instituicao').textContent = pg.instituicao || '';
+        document.getElementById('pix-chave').textContent = pg.chave;
+        document.getElementById('pix-recado').textContent = pg.recado || '';
+        document.getElementById('pix').style.display = 'block';
       }
 
       const data = new Date(pedido.criado_em || Date.now());
