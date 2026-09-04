@@ -62,7 +62,7 @@ const semAcento = (t) => String(t ?? '')
 
 // Deixa a chave no formato que o padrão espera.
 //
-// Telefone precisa de +55 e DDD — "21983320678" sozinho não é chave válida.
+// Telefone precisa de +55 e DDD — "11987654321" sozinho não é chave válida.
 // CPF e CNPJ vão só com os dígitos. E-mail e chave aleatória vão como estão.
 // CPF e telefone celular têm os MESMOS 11 dígitos, e não dá para
 // distinguir pelo formato. O que separa os dois é o dígito verificador:
@@ -141,8 +141,11 @@ function arrumarChave(chave, tipo = null) {
 // `valor` fica de fora quando não vier: QR sem valor deixa o cliente digitar
 // quanto vai pagar, que é o que serve para um cartaz no balcão. Com valor,
 // serve para um pedido específico.
-function gerar({ chave, nome, cidade, valor = null, descricao = '', txid = '***' }) {
-  const k = arrumarChave(chave);
+// `tipo` atravessa até o arrumarChave de propósito. Ele já sabia decidir sem
+// adivinhar quando o tipo vem dito, mas nada chegava a passar o parâmetro — e
+// CPF e celular, que têm os mesmos 11 dígitos, caíam sempre no palpite.
+function gerar({ chave, nome, cidade, tipo = null, valor = null, descricao = '', txid = '***' }) {
+  const k = arrumarChave(chave, tipo);
 
   const nomeLimpo = semAcento(nome).slice(0, LIMITE.nome);
   const cidadeLimpa = semAcento(cidade).slice(0, LIMITE.cidade) || 'BRASIL';

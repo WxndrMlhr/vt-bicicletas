@@ -173,6 +173,15 @@ ipcMain.handle('config:salvar', (e, dados) => {
 });
 ipcMain.handle('config:restaurar', () => configuracoes.restaurarPadroes());
 
+// A prévia do PIX da tela de configurações: recebe o que está digitado e
+// devolve o QR ou o motivo de a chave não servir. E o bloco de verdade, com
+// valor, para a tela da venda mostrar enquanto o cliente decide.
+ipcMain.handle('pagamento:previa', (e, dados) =>
+  require('./pagamento').previa(dados || {}));
+
+ipcMain.handle('pagamento:pix', (e, valor) =>
+  require('./pagamento').dados({ valor }));
+
 ipcMain.handle('relatorios:gerar', (event, inicio, fim) =>
   relatorios.relatorioCompleto(inicio, fim)
 );

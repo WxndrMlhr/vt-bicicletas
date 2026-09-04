@@ -361,7 +361,47 @@ tr.selecionada td { border-bottom-color: #D3DFEC; }
 }
 .aba.ativa { background: var(--aco-900); color: var(--branco); border-color: var(--aco-900); }
 
+/* ---------- Recados na própria página ---------- */
+/* Substituem o alert() do Windows, que é modal: enquanto ele existe a
+   janela não aceita teclado, e se ele for parar atrás da janela principal
+   não há como respondê-lo — o sistema parece travado. */
+.aviso {
+  border-radius: var(--raio);
+  padding: 0.7rem 0.85rem;
+  font-size: 0.86rem;
+  border: 1px solid;
+  border-left-width: 3px;
+}
+.aviso.erro    { background: #FBEFE9; border-color: #E8BBA6; border-left-color: var(--oxido); color: var(--oxido); }
+.aviso.certo   { background: #EDF6F1; border-color: #B7D9C7; border-left-color: var(--verde); color: var(--verde); }
+.aviso.atencao { background: #FCF6E4; border-color: #E8D08C; border-left-color: var(--ambar-alto); color: var(--ambar-alto); }
+
+/* A pergunta de sim ou não, desenhada na página. */
+.pergunta-fundo {
+  position: fixed; inset: 0; background: rgba(22,25,31,0.45);
+  z-index: 200; display: flex; align-items: center; justify-content: center;
+}
+.pergunta-caixa {
+  background: var(--branco); border-radius: var(--raio);
+  padding: 1.4rem 1.5rem; width: min(440px, 92vw);
+  box-shadow: 0 20px 50px rgba(22,25,31,0.28);
+}
+.pergunta-caixa .texto { font-size: 0.95rem; white-space: pre-line; margin-bottom: 1.1rem; }
+
 @media (max-width: 1100px) {
   .grade-4 { grid-template-columns: repeat(2, 1fr); }
   .grade-3, .grade-2, .grade-larga { grid-template-columns: 1fr; }
 }
+
+/* ---------- O QR do PIX ----------
+   O SVG chega com width e height PRÓPRIOS, em pixels, do tamanho que o
+   gerador desenhou — e não do tamanho do lugar onde ele cai. Sem esta
+   regra ele estoura o quadro e passa por cima do texto ao lado.
+
+   Quem manda no tamanho é o `width` do .qr-pix; o SVG obedece. */
+.qr-pix { flex: none; line-height: 0; }
+.qr-pix svg { width: 100%; height: auto; display: block; }
+
+/* O texto ao lado do QR. O min-width: 0 é o que deixa a linha quebrar
+   dentro do flex em vez de empurrar o desenho para fora. */
+.pix-ao-lado { flex: 1; min-width: 0; }

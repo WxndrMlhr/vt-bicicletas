@@ -72,7 +72,16 @@ contextBridge.exposeInMainWorld('erpAPI', {
   config: {
     tudo: () => ipcRenderer.invoke('config:tudo'),
     salvar: (dados) => ipcRenderer.invoke('config:salvar', dados),
-    restaurar: () => ipcRenderer.invoke('config:restaurar')
+    restaurar: () => ipcRenderer.invoke('config:restaurar'),
+    // A prévia do PIX é da tela de configurações: quem chama é quem está
+    // cadastrando a chave.
+    previaPix: (dados) => ipcRenderer.invoke('pagamento:previa', dados)
+  },
+
+  // Recebimento. Serve ao balcão e ao papel, então não mora dentro de
+  // nenhum dos dois.
+  pagamento: {
+    pix: (valor) => ipcRenderer.invoke('pagamento:pix', valor)
   },
 
   relatorios: {

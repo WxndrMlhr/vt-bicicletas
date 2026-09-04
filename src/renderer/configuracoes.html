@@ -109,6 +109,55 @@
 
       <section>
         <div class="cartao">
+          <h2 class="secao">Receber por PIX</h2>
+          <div style="font-size:0.8rem; color:var(--aco-500); margin-bottom:1rem;">
+            É esta chave que vira o QR no fim do cupom, já com o valor da venda
+            dentro. Confira no quadrado abaixo antes de salvar: o nome que
+            aparecer aqui é o que o cliente vê no aplicativo dele.
+          </div>
+
+          <div class="linha-campos c2">
+            <div>
+              <label class="campo" for="pix_chave">Chave PIX</label>
+              <input type="text" id="pix_chave" data-config
+                     placeholder="CPF, CNPJ, telefone, e-mail ou aleatória">
+            </div>
+            <div>
+              <label class="campo" for="pix_nome">Nome do titular</label>
+              <input type="text" id="pix_nome" data-config placeholder="Como está na conta">
+            </div>
+          </div>
+
+          <div class="linha-campos c2" style="margin-top:0.9rem;">
+            <div>
+              <label class="campo" for="pix_tipo">Tipo da chave</label>
+              <select id="pix_tipo">
+                <option value="auto">Descobrir sozinho</option>
+                <option value="cpf">CPF</option>
+                <option value="cnpj">CNPJ</option>
+                <option value="telefone">Telefone</option>
+                <option value="email">E-mail</option>
+                <option value="aleatoria">Aleatória</option>
+              </select>
+              <div style="font-size:0.8rem; color:var(--aco-500); margin-top:0.35rem;">
+                CPF e celular têm os mesmos 11 dígitos. Se o QR sair errado,
+                diga o tipo aqui.
+              </div>
+            </div>
+            <div>
+              <label class="campo" for="pix_instituicao">Banco (só para o papel)</label>
+              <input type="text" id="pix_instituicao" data-config placeholder="Ex: Mercado Pago">
+            </div>
+          </div>
+
+          <!-- A prévia sai do que está DIGITADO, não do que está salvo: quem
+               cadastra a chave precisa ver o quadrado antes de gravar. -->
+          <div id="previa-pix" style="margin-top:1rem;"></div>
+        </div>
+      </section>
+
+      <section>
+        <div class="cartao">
           <h2 class="secao">Impressora do cupom</h2>
 
           <div style="margin-bottom: 0.9rem;">
@@ -284,11 +333,64 @@
           silencioso: silenciosaEl.checked
         });
       } catch (erro) {
-        alert(`Não deu para imprimir o teste:\n${motivo(erro)}`);
+        avisar(`Não deu para imprimir o teste: ${motivo(erro)}`, 'erro');
       }
       botao.disabled = false;
       botao.textContent = 'Imprimir página de teste';
     });
+
+    // ---------- Prévia do PIX ----------
+    //
+    // Gera o QR a partir do que está digitado, com R$ 1,00 de valor de
+    // mentira só para o código ficar completo. Serve para apontar o próprio
+    // celular e ver o nome do titular ANTES de a chave ir para o cupom.
+    let previaPixPedida = 0;
+    async function desenharPreviaPix() {
+      const alvo = document.getElementById('previa-pix');
+      if (!alvo) return;
+
+      // Cada tecla dispara uma ida ao processo principal, e elas voltam fora
+      // de ordem. Só a resposta da última digitação chega a desenhar.
+      const minha = ++previaPixPedida;
+
+      let r;
+      try {
+        r = await window.erpAPI.config.previaPix({
+          chave: document.getElementById('pix_chave').value,
+          nome: document.getElementById('pix_nome').value,
+          tipo: document.getElementById('pix_tipo').value,
+          valor: 1
+        });
+      } catch (erro) {
+        r = { ok: false, erro: String(erro && erro.message || erro) };
+      }
+      if (minha !== previaPixPedida) return;
+
+      if (r.falta) {
+        alvo.innerHTML = '<div style="font-size:0.8rem; color:var(--aco-500);">'
+          + 'Preencha a chave e o nome para ver o QR aqui.</div>';
+        return;
+      }
+      if (!r.ok) {
+        alvo.innerHTML = `<div style="font-size:0.85rem; color:var(--oxido);">`
+          + `${escapar(r.erro)}</div>`;
+        return;
+      }
+      alvo.innerHTML = `
+        <div style="display:flex; gap:1rem; align-items:flex-start;">
+          <div class="qr-pix" style="width:140px;">${r.qr}</div>
+          <div class="pix-ao-lado" style="font-size:0.85rem; line-height:1.6;">
+            <div><strong>${escapar(r.nome)}</strong></div>
+            <div style="color:var(--aco-500);">${escapar(r.tipoDaChave)} — ${escapar(r.chave)}</div>
+            <div style="margin-top:0.35rem;">Teste com R$ 1,00. Aponte a câmera e
+              confira se o nome que aparece é o seu.</div>
+          </div>
+        </div>`;
+    }
+
+    ['pix_chave', 'pix_nome'].forEach(id =>
+      document.getElementById(id).addEventListener('input', desenharPreviaPix));
+    document.getElementById('pix_tipo').addEventListener('change', desenharPreviaPix);
 
     // ---------- Carregar / salvar ----------
     async function carregar() {
@@ -296,6 +398,8 @@
       document.querySelectorAll('input[data-config]').forEach(el => {
         el.value = c[el.id] ?? '';
       });
+      document.getElementById('pix_tipo').value = c.pix_tipo || 'auto';
+      desenharPreviaPix();
       silenciosaEl.checked = c.impressao_silenciosa === '1';
       marcarLargura(c.impressao_largura_mm);
       await carregarImpressoras(c.impressao_impressora);
@@ -313,6 +417,7 @@
       document.querySelectorAll('input[data-config]').forEach(el => {
         dados[el.id] = el.value.trim();
       });
+      dados.pix_tipo = document.getElementById('pix_tipo').value;
       dados.impressao_impressora = impressoraEl.value;
       dados.impressao_silenciosa = silenciosaEl.checked ? '1' : '0';
       dados.impressao_largura_mm = String(larguraMM);
@@ -320,13 +425,14 @@
         await window.erpAPI.config.salvar(dados);
         mostrarSalvo();
       } catch (erro) {
-        alert(`Não deu para salvar: ${motivo(erro)}`);
+        avisar(`Não deu para salvar: ${motivo(erro)}`, 'erro');
       }
       botao.disabled = false;
     });
 
     document.getElementById('btn-restaurar').addEventListener('click', async () => {
-      if (!confirm('Voltar todas as configurações para os valores de fábrica?')) return;
+      if (!await perguntar('Voltar todas as configurações para os valores de fábrica?',
+          { sim: 'Restaurar', perigo: true })) return;
       await window.erpAPI.config.restaurar();
       await carregar();
       mostrarSalvo();

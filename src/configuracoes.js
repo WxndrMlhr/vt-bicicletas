@@ -27,12 +27,21 @@ const PADROES = {
   // Ficam aqui, e não escritos nos documentos, para trocar de chave não
   // depender de mexer no código. Vazio em qualquer um deles faz o bloco
   // inteiro sumir do papel.
-  pix_chave: '21983320678',
+  //
+  // Nascem VAZIOS de propósito. A chave e o nome de quem recebe são dado
+  // pessoal, e este repositório é público: escritos aqui, iam junto para o
+  // GitHub a cada envio. Os valores de verdade ficam no banco da loja, que o
+  // .gitignore bloqueia, e se cadastram em Configurações → Receber por PIX.
+  pix_chave: '',
   // O nome que aparece no aplicativo de quem paga. O padrão do PIX aceita
-  // 25 caracteres, e "Francilene Cascaes Malheiro" tem 27 — por isso o
-  // nome do meio vai abreviado, senão o corte cairia no meio da palavra.
-  pix_nome: 'Francilene C Malheiro',
-  pix_instituicao: 'Mercado Pago',
+  // 25 caracteres; nome mais comprido que isso é cortado, então vale abreviar
+  // o do meio na hora de cadastrar, senão o corte cai no meio da palavra.
+  pix_nome: '',
+  pix_instituicao: '',
+  // CPF e celular têm os mesmos 11 dígitos, e o gerador separa os dois pelo
+  // dígito verificador. Quase sempre acerta; quando erra, sai um QR que
+  // ninguém consegue pagar. Dizer o tipo tira o palpite do caminho.
+  pix_tipo: 'auto',              // auto | cpf | cnpj | telefone | email | aleatoria
   pix_recado: '',                // "avisar no WhatsApp depois de pagar", por exemplo
 
   // --- Controle interno ---

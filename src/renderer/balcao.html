@@ -82,6 +82,72 @@
       color: var(--aco-500);
       margin-top: 0.4rem;
     }
+
+    /* ---------- A caixinha de venda realizada ---------- */
+    .cobertura-venda {
+      position: fixed; inset: 0; background: rgba(22,25,31,0.45);
+      z-index: 60; display: none;
+    }
+    .cobertura-venda.aberta { display: block; }
+
+    .caixa-venda {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: var(--branco); border-radius: var(--raio);
+      box-shadow: 0 24px 60px rgba(22,25,31,0.3);
+      padding: 1.7rem 1.9rem 1.6rem; width: min(420px, 92vw);
+      z-index: 61; display: none; text-align: center;
+    }
+    .caixa-venda.aberta { display: block; }
+
+    .caixa-venda .certo {
+      width: 46px; height: 46px; margin: 0 auto 0.7rem;
+      border-radius: 50%; background: #EDF6F1; color: var(--verde);
+      font-size: 26px; line-height: 46px; font-weight: 700;
+    }
+    .caixa-venda h2 {
+      font-family: var(--face-titulo); font-size: 1.35rem; margin: 0;
+    }
+    .caixa-venda .numero-venda {
+      font-family: var(--face-numero); color: var(--aco-500);
+      font-size: 0.87rem; margin-top: 0.15rem;
+    }
+
+    .resumo-venda {
+      margin-top: 1.2rem; text-align: left;
+      border-top: 1px solid var(--aco-100); padding-top: 0.9rem;
+    }
+    .resumo-venda > div {
+      display: flex; justify-content: space-between; gap: 1rem;
+      font-size: 0.9rem; padding: 0.22rem 0;
+    }
+    .resumo-venda .r { color: var(--aco-500); }
+    .resumo-venda .v { font-family: var(--face-numero); text-align: right; }
+    .resumo-venda .destaque {
+      font-size: 1.15rem; font-weight: 700; padding-top: 0.5rem;
+      margin-top: 0.35rem; border-top: 1px solid var(--aco-100);
+    }
+
+    /* O recado fica DENTRO da caixinha de propósito: se o cupom não sair,
+       a notícia tem de aparecer junto do botão que tenta de novo, e não
+       num alerta do Windows saltando por cima. */
+    .caixa-venda .recado {
+      display: none; margin-top: 0.9rem; text-align: left;
+      border-radius: var(--raio); padding: 0.6rem 0.7rem;
+      font-size: 0.83rem; border: 1px solid; border-left-width: 3px;
+    }
+    .caixa-venda .recado.erro    { background: #FBEFE9; border-color: #E8BBA6; color: var(--oxido); }
+    .caixa-venda .recado.atencao { background: #FCF6E4; border-color: #E8D08C; color: var(--ambar-alto); }
+    .caixa-venda .recado.certo   { background: #EDF6F1; border-color: #B7D9C7; color: var(--verde); }
+
+    .caixa-venda .segunda-via {
+      width: 100%; margin-top: 0.5rem;
+      background: transparent; border-color: var(--aco-100); color: var(--aco-500);
+    }
+    .caixa-venda .segunda-via:hover { background: var(--papel); color: var(--aco-700); }
+    .caixa-venda .dica {
+      font-size: 0.78rem; color: var(--aco-500);
+      margin-top: 0.7rem; text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -134,21 +200,47 @@
             <button data-meio="cartao">Cartão</button>
           </div>
 
+          <!-- O QR aparece aqui, com o total da venda dentro, enquanto o
+               cliente decide. É antes de finalizar de propósito: é agora que
+               ele aponta a câmera e paga. -->
+          <div id="bloco-pix-venda" style="margin-bottom: 1rem;"></div>
+
           <label class="campo" for="cliente">Cliente (opcional)</label>
           <input type="text" id="cliente" placeholder="Só se quiser registrar" style="margin-bottom: 1rem;">
 
-          <button class="botao-finalizar" id="btn-finalizar">Finalizar e imprimir</button>
+          <!-- Um botão só. Antes eram três, e a escolha do papel vinha
+               ANTES de a venda existir: quem clicava em "Finalizar e
+               imprimir" via o diálogo do Windows pular na tela sem aviso,
+               no meio do atendimento. Agora a venda é registrada primeiro e
+               o papel se decide depois, na caixinha, olhando o cliente.
+               Cupom, PDF e sem papel continuam todos lá. -->
+          <button class="botao-finalizar" id="btn-finalizar">Finalizar venda</button>
           <div style="display: flex; gap: 0.5rem; margin-top: 0.6rem;">
-            <button class="neutro" id="btn-pdf" style="flex: 1;">Finalizar e baixar PDF</button>
-          </div>
-          <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
-            <button class="neutro" id="btn-so-salvar" style="flex: 1;">Sem imprimir</button>
             <button class="neutro" id="btn-limpar" style="flex: 1;">Limpar</button>
           </div>
         </div>
       </div>
     </div>
   </main>
+
+  <!-- Depois da venda. -->
+  <div class="cobertura-venda" id="cobertura-venda"></div>
+  <div class="caixa-venda" id="caixa-venda" role="dialog" aria-modal="true"
+       aria-labelledby="venda-titulo">
+    <div class="certo">✓</div>
+    <h2 id="venda-titulo">Venda realizada</h2>
+    <div class="numero-venda" id="venda-numero"></div>
+
+    <div class="resumo-venda" id="venda-resumo"></div>
+    <div class="recado" id="venda-recado"></div>
+
+    <div class="acoes" style="margin-top:1.4rem;">
+      <button class="neutro" id="btn-fechar-venda">Fechar</button>
+      <button id="btn-imprimir-venda">Imprimir cupom</button>
+    </div>
+    <button class="neutro mini segunda-via" id="btn-pdf-venda">Baixar em PDF</button>
+    <div class="dica">Enter imprime · Esc fecha</div>
+  </div>
 
   <script>
     let itens = [];
@@ -276,6 +368,7 @@
         avisoBalcaoEl.style.display = 'none';
         avisoEstoqueEl.style.display = 'none';
         ultimoCalculo = null;
+        mostrarPix();
         return;
       }
 
@@ -307,6 +400,7 @@
       });
 
       totalEl.textContent = real(r.total);
+      mostrarPix();
 
       if (r.semPrecoBalcao && r.semPrecoBalcao.length > 0) {
         avisoBalcaoEl.innerHTML = `
@@ -362,6 +456,42 @@
       if (botao) remover(Number(botao.dataset.remover));
     });
 
+    // ---------- O QR do pix, com o total dentro ----------
+    //
+    // Aparece no meio "Dinheiro / Pix", que é onde o pix mora hoje nesta
+    // tela. QR sem valor faria o cliente digitar, e é digitando que sai
+    // menos do que a conta.
+    let pixPedido = 0;
+    async function mostrarPix() {
+      const alvo = document.getElementById('bloco-pix-venda');
+      if (!alvo) return;
+
+      const total = ultimoCalculo && ultimoCalculo.total;
+      if (meioPagamento !== 'dinheiro' || !total) { alvo.innerHTML = ''; return; }
+
+      // O total muda a cada item, e as respostas voltam fora de ordem.
+      const meu = ++pixPedido;
+      let p = null;
+      try {
+        p = await window.erpAPI.pagamento.pix(total);
+      } catch (erro) {
+        p = null;
+      }
+      if (meu !== pixPedido || meioPagamento !== 'dinheiro') return;
+      if (!p) { alvo.innerHTML = ''; return; }
+
+      alvo.innerHTML = `
+        <div style="display:flex; gap:0.9rem; align-items:flex-start;">
+          <div class="qr-pix" style="width:132px;">${p.qrGrande}</div>
+          <div class="pix-ao-lado" style="font-size:0.85rem; line-height:1.55;">
+            <div><strong>${escapar(p.nome)}</strong></div>
+            <div style="color:var(--aco-500);">${escapar(p.tipoDaChave)} — ${escapar(p.chave)}</div>
+            <div style="margin-top:0.3rem;">Cobrando <strong>${real(total)}</strong>,
+              já dentro do código.</div>
+          </div>
+        </div>`;
+    }
+
     // ---------- Meio de pagamento ----------
     document.querySelectorAll('.meio-pagamento button').forEach(botao => {
       botao.addEventListener('click', () => {
@@ -369,6 +499,7 @@
         botao.classList.add('escolhido');
         meioPagamento = botao.dataset.meio;
         guardarRascunho();
+        mostrarPix();
       });
     });
 
@@ -384,29 +515,32 @@
       buscaEl.focus();
     }
 
-    // saida: 'cupom' (mini impressora), 'pdf' (via em folha A4) ou 'nada'
     // Trava contra clique duplo.
     //
-    // Sem ela, dois cliques rápidos em "Finalizar e imprimir" gravavam a
-    // venda DUAS VEZES — dois pedidos, estoque baixado duas vezes — porque
-    // o `await` do salvar demora e nada impedia a segunda entrada. Travar
-    // só o botão não bastava: são três botões chamando esta mesma função, e
-    // o teclado também dispara. A trava fica aqui, onde todos passam.
+    // Sem ela, dois cliques rápidos em "Finalizar" gravavam a venda DUAS
+    // VEZES — dois pedidos, estoque baixado duas vezes — porque o `await`
+    // do salvar demora e nada impedia a segunda entrada. Travar só o botão
+    // não bastava: o teclado também dispara. A trava fica aqui, no caminho
+    // por onde todos passam.
     let finalizando = false;
 
-    async function finalizar(saida) {
+    async function finalizar() {
       if (finalizando) return;
       if (!ultimoCalculo || itens.length === 0) {
-        alert('Adicione pelo menos uma peça.');
+        avisar('Adicione pelo menos uma peça.', 'atencao');
         return;
       }
 
       finalizando = true;
       travarBotoes(true);
-      let id = null;
       try {
+        // O que a caixinha vai mostrar tem de ser guardado ANTES de limpar
+        // o balcão: `limpar` zera o cálculo, e aí não há mais total nenhum.
         const total = ultimoCalculo.total;
-        id = await window.erpAPI.pedidos.salvar({
+        const pecas = ultimoCalculo.linhas.length;
+        const unidades = ultimoCalculo.linhas.reduce((s, l) => s + l.quantidade, 0);
+
+        const id = await window.erpAPI.pedidos.salvar({
           cliente: document.getElementById('cliente').value.trim(),
           cliente_id: null,
           formaPagamento: 'balcao',
@@ -415,26 +549,16 @@
           total
         });
 
-        if (saida === 'cupom') {
-          try {
-            await window.erpAPI.impressao.imprimir(id);
-          } catch (erro) {
-            alert(`Venda #${id} registrada, mas a impressão falhou:\n${motivo(erro)}`);
-          }
-        } else if (saida === 'pdf') {
-          try {
-            await window.erpAPI.pedidos.salvarPDF(id, { abrirDepois: true });
-          } catch (erro) {
-            alert(`Venda #${id} registrada, mas o PDF falhou:\n${motivo(erro)}`);
-          }
-        } else {
-          alert(`Venda #${id} registrada. Total ${real(total)}.`);
-        }
+        // A venda está gravada: o balcão fica pronto para a próxima ANTES
+        // de a caixinha abrir. Quem fechar a caixinha não encontra sobra da
+        // venda anterior no carrinho.
         limpar();
+
+        abrirCaixaDaVenda({ id, total, pecas, unidades, meio: meioPagamento });
       } catch (erro) {
         // Falha no SALVAR, que é diferente de falha na impressão: aqui não
         // há venda nenhuma, e o carrinho não pode ser limpo.
-        alert(`Não deu para registrar a venda:\n${motivo(erro)}`);
+        avisar(`Não deu para registrar a venda: ${motivo(erro)}`, 'erro');
       } finally {
         finalizando = false;
         travarBotoes(false);
@@ -442,24 +566,138 @@
     }
 
     function travarBotoes(travado) {
-      for (const id of ['btn-finalizar', 'btn-so-salvar', 'btn-pdf']) {
+      for (const id of ['btn-finalizar', 'btn-limpar']) {
         const b = document.getElementById(id);
         if (b) b.disabled = travado;
       }
     }
 
-    document.getElementById('btn-finalizar').addEventListener('click', () => finalizar('cupom'));
-    document.getElementById('btn-so-salvar').addEventListener('click', () => finalizar('nada'));
+    document.getElementById('btn-finalizar').addEventListener('click', () => finalizar());
     document.getElementById('btn-limpar').addEventListener('click', limpar);
 
-    document.getElementById('btn-pdf').addEventListener('click', async (ev) => {
-      const botao = ev.target;
-      botao.disabled = true;
-      botao.textContent = 'Gerando...';
-      await finalizar('pdf');
-      botao.disabled = false;
-      botao.textContent = 'Finalizar e baixar PDF';
+    // ---------- A caixinha depois da venda ----------
+    //
+    // Ela existe para o balcão parar de imprimir sozinho. O diálogo do
+    // Windows abrindo sem aviso, no meio do atendimento, é o tipo de coisa
+    // que faz a pessoa clicar em qualquer lugar para se livrar dele.
+    let vendaNaCaixa = null;
+
+    const MEIOS = { dinheiro: 'Dinheiro / Pix', cartao: 'Cartão' };
+
+    function abrirCaixaDaVenda(venda) {
+      vendaNaCaixa = venda;
+
+      document.getElementById('venda-numero').textContent = `Venda #${venda.id}`;
+
+      const linha = (rotulo, valor, classe = '') =>
+        `<div class="${classe}"><span class="r">${escapar(rotulo)}</span>` +
+        `<span class="v">${escapar(valor)}</span></div>`;
+
+      // Quantas peças diferentes e quantas unidades ao todo. Só diz as
+      // unidades quando o número é outro: "3 peças · 3 unidades" é ruído.
+      const contagem = venda.unidades > venda.pecas
+        ? `${venda.pecas} ${venda.pecas === 1 ? 'peça' : 'peças'} · ${venda.unidades} un`
+        : `${venda.pecas} ${venda.pecas === 1 ? 'peça' : 'peças'}`;
+
+      document.getElementById('venda-resumo').innerHTML = [
+        linha('Itens', contagem),
+        linha('Total', real(venda.total), 'destaque'),
+        linha('Pagamento', MEIOS[venda.meio] || venda.meio)
+      ].join('');
+
+      recado('');
+      document.getElementById('cobertura-venda').classList.add('aberta');
+      document.getElementById('caixa-venda').classList.add('aberta');
+      // O foco vai para Imprimir: é o botão que quase sempre se usa, e
+      // assim Enter já resolve sem tirar a mão do teclado.
+      document.getElementById('btn-imprimir-venda').focus();
+    }
+
+    function recado(texto, tipo = 'erro') {
+      const el = document.getElementById('venda-recado');
+      el.textContent = texto;
+      el.className = `recado ${tipo}`;
+      el.style.display = texto ? 'block' : 'none';
+    }
+
+    function fecharCaixaDaVenda() {
+      vendaNaCaixa = null;
+      document.getElementById('cobertura-venda').classList.remove('aberta');
+      document.getElementById('caixa-venda').classList.remove('aberta');
+      // De volta para a busca: o balcão fica pronto para a próxima venda
+      // sem ninguém precisar clicar no campo.
+      buscaEl.focus();
+    }
+
+    document.getElementById('btn-fechar-venda').addEventListener('click', fecharCaixaDaVenda);
+    document.getElementById('cobertura-venda').addEventListener('click', fecharCaixaDaVenda);
+
+    // Enquanto o papel está saindo, os dois botões travam: mandar o mesmo
+    // cupom duas vezes é papel jogado fora e confunde quem confere depois.
+    function travarSaidas(travado) {
+      for (const id of ['btn-imprimir-venda', 'btn-pdf-venda']) {
+        document.getElementById(id).disabled = travado;
+      }
+    }
+
+    document.getElementById('btn-imprimir-venda').addEventListener('click', async () => {
+      if (!vendaNaCaixa) return;
+      const botao = document.getElementById('btn-imprimir-venda');
+      const rotulo = botao.textContent;
+      travarSaidas(true);
+      botao.textContent = 'Imprimindo...';
+      recado('');
+      try {
+        const r = await window.erpAPI.impressao.imprimir(vendaNaCaixa.id);
+        if (r && r.impresso) {
+          // Imprimiu: a caixinha já cumpriu o papel e sai da frente.
+          fecharCaixaDaVenda();
+        } else if (r && r.motivo === 'cancelled') {
+          recado('Impressão cancelada. A venda continua registrada.', 'atencao');
+        } else {
+          recado('A impressora não confirmou a impressão. A venda continua registrada.', 'atencao');
+        }
+      } catch (erro) {
+        // A venda está gravada de qualquer jeito. Falha de impressora não
+        // desfaz nada, e a caixinha continua aberta para tentar de novo.
+        recado(`Venda #${vendaNaCaixa.id} registrada, mas o cupom não saiu: ${motivo(erro)}`);
+      }
+      travarSaidas(false);
+      botao.textContent = rotulo;
     });
+
+    document.getElementById('btn-pdf-venda').addEventListener('click', async () => {
+      if (!vendaNaCaixa) return;
+      const botao = document.getElementById('btn-pdf-venda');
+      const rotulo = botao.textContent;
+      travarSaidas(true);
+      botao.textContent = 'Gerando...';
+      recado('');
+      try {
+        await window.erpAPI.pedidos.salvarPDF(vendaNaCaixa.id, { abrirDepois: true });
+        fecharCaixaDaVenda();
+      } catch (erro) {
+        recado(`Venda #${vendaNaCaixa.id} registrada, mas o PDF não saiu: ${motivo(erro)}`);
+      }
+      travarSaidas(false);
+      botao.textContent = rotulo;
+    });
+
+    // Na captura, e não na subida: a cobertura barra o mouse, mas o Tab
+    // ainda alcança os botões de trás. Pegando a tecla antes de ela chegar
+    // ao que estiver com o foco, um Enter não aciona a caixinha E o botão
+    // escondido atrás dela ao mesmo tempo.
+    document.addEventListener('keydown', (e) => {
+      if (!vendaNaCaixa) return;
+      if (e.key === 'Escape') {
+        e.preventDefault(); e.stopPropagation();
+        fecharCaixaDaVenda();
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault(); e.stopPropagation();
+        document.getElementById('btn-imprimir-venda').click();
+      }
+    }, true);
 
     // ---------- Abertura da tela ----------
     function iniciar() {
