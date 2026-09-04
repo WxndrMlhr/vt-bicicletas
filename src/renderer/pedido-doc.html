@@ -90,12 +90,14 @@
         <div class="codigo" id="pix-qr"></div>
         <div class="campos">
           <div class="marca-pix">PIX</div>
-          <div><span class="rotulo" id="pix-rotulo-chave">Chave</span><br>
+          <!-- Rótulo e valor na MESMA linha. Empilhados eram seis linhas
+               para três informações, e isso sozinho jogava o rodapé de um
+               pedido curto para a segunda folha. -->
+          <div><span class="rotulo" id="pix-rotulo-chave">Chave</span>
             <span class="chave" id="pix-chave"></span></div>
-          <div style="margin-top:1.5mm;"><span class="rotulo">Nome</span><br>
+          <div><span class="rotulo">Nome</span>
             <span class="valor" id="pix-nome"></span></div>
-          <div style="margin-top:1.5mm;" id="pix-linha-instituicao">
-            <span class="rotulo">Instituição</span><br>
+          <div id="pix-linha-instituicao"><span class="rotulo">Instituição</span>
             <span id="pix-instituicao"></span></div>
           <div class="recado oculto" id="pix-recado"></div>
         </div>

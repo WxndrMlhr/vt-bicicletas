@@ -49,10 +49,12 @@ body {
   justify-content: space-between;
   gap: 8mm;
   border-bottom: 2.5pt solid #16191F;
-  padding-bottom: 3mm;
+  padding-bottom: 2.2mm;
 }
 .topo .marca { display: flex; align-items: center; gap: 5mm; }
-.topo .logo { width: 32mm; height: auto; display: block; flex-shrink: 0; }
+/* A logo é a coisa mais alta da faixa, então é ela que decide a altura do
+   cabeçalho — e cada milímetro no alto é um milímetro a menos de item. */
+.topo .logo { width: 29mm; height: auto; display: block; flex-shrink: 0; }
 .topo .loja-dados { font-size: 8.4pt; color: #5C6675; line-height: 1.45; }
 
 .selo-doc { text-align: right; flex-shrink: 0; }
@@ -79,7 +81,9 @@ h2 {
   text-transform: uppercase;
   color: #5C6675;
   font-weight: 600;
-  margin: 3.5mm 0 1.5mm;
+  /* Aparece quatro vezes na folha (Cliente, Itens, Pagamento, Dados para
+     pagamento): cada milímetro tirado aqui vale por quatro. */
+  margin: 2.4mm 0 1.2mm;
 }
 
 .painel {
@@ -104,12 +108,14 @@ thead th {
   background: #16191F;
   font-weight: 600;
   text-align: left;
-  padding: 2mm 2.5mm;
+  padding: 1.6mm 2.5mm;
 }
 thead th.num { text-align: right; }
 
 tbody td {
-  padding: 1.5mm 2.5mm;
+  /* Repete uma vez por item: num pedido de 13 peças, 0,4mm por linha
+     viram meio centímetro de folha. */
+  padding: 1.1mm 2.5mm;
   border-bottom: 0.5pt solid #DFE3E8;
   font-size: 9.8pt;
   vertical-align: top;
@@ -205,7 +211,7 @@ thead { display: table-header-group; }
 .assinaturas {
   display: flex;
   gap: 14mm;
-  margin-top: 10mm;
+  margin-top: 4mm;
   page-break-inside: avoid;
 }
 .assinaturas div { flex: 1; text-align: center; }
@@ -213,8 +219,8 @@ thead { display: table-header-group; }
 .assinaturas .papel { font-size: 8.6pt; color: #5C6675; }
 
 .rodape {
-  margin-top: 5mm;
-  padding-top: 2mm;
+  margin-top: 3.5mm;
+  padding-top: 1.5mm;
   border-top: 0.8pt solid #DFE3E8;
   text-align: center;
   font-size: 8.2pt;
@@ -224,19 +230,25 @@ thead { display: table-header-group; }
 /* ---------- Dados para pagamento ----------
    Fecha o documento: o QR à esquerda e os dados à direita. Fica junto do
    fecho e não pode partir entre duas folhas — QR cortado ao meio não lê. */
-.pagamento-loja { page-break-inside: avoid; margin-top: 5mm; }
+/* Este bloco tem `page-break-inside: avoid`: se não couber no que sobra da
+   folha, ele pula INTEIRO para a seguinte e deixa um buraco atrás. Por isso
+   ele é o primeiro lugar onde se corta altura quando um pedido curto começa
+   a sair em duas folhas. */
+.pagamento-loja { page-break-inside: avoid; margin-top: 3.5mm; }
 .pagamento-loja .conteudo {
   display: flex;
   align-items: center;
-  gap: 6mm;
+  gap: 5mm;
   border: 0.8pt solid #C9CDD4;
   border-radius: 1.5mm;
-  padding: 3.5mm 4mm;
+  padding: 2.5mm 3mm;
 }
 .pagamento-loja .codigo { flex-shrink: 0; line-height: 0; }
-.pagamento-loja .codigo svg { width: 30mm; height: 30mm; display: block; }
-.pagamento-loja .campos { font-size: 9.5pt; line-height: 1.5; }
-.pagamento-loja .marca-pix { font-size: 12pt; font-weight: 700; margin-bottom: 1mm; }
+/* 25mm ainda é folgado para leitura de celular: são 57 quadradinhos de
+   lado, quase meio milímetro cada. */
+.pagamento-loja .codigo svg { width: 25mm; height: 25mm; display: block; }
+.pagamento-loja .campos { font-size: 9.5pt; line-height: 1.38; }
+.pagamento-loja .marca-pix { font-size: 11pt; font-weight: 700; margin-bottom: 0.6mm; }
 .pagamento-loja .rotulo { color: #5C6675; font-size: 8pt; }
 .pagamento-loja .valor { font-weight: 600; }
 .pagamento-loja .chave {
