@@ -29,6 +29,54 @@ function imprimirPedido(pedido, opcoes = {}) {
         () => mandarCupom(pedido, opcoes, salvo, silencioso));
 }
 
+// O pageSize do Electron fala em micra; o navegador mede em px de tela, que
+// são 96 por polegada.
+const MICRA_POR_PX = 25400 / 96;
+
+// Sobra no fim do cupom, para o corte não comer a última linha.
+//
+// 8mm bastam, e há medida por trás: o layout de impressão é mais CURTO que o
+// da tela (medido na POS80 da loja: 220mm de impressão contra 222,8mm que a
+// tela informa), então a altura já sai com folga antes desta.
+const SOBRA_MM = 8;
+
+// Quando não dá para medir, um rolo de tamanho fixo. Sai papel em branco no
+// fim, mas imprime — e não mandar tamanho nenhum é o caso que NÃO imprime.
+const ALTURA_RESERVA_MICRA = 297 * 1000;
+
+// Mede a altura do cupom montado.
+//
+// Espera as imagens antes de medir: a logo fica no alto e o QR do pix no pé,
+// e medir antes de eles decodificarem dá folha curta demais — o fim do cupom
+// sairia cortado, defeito pior que o que estamos consertando.
+async function medirAlturaMicra(janela) {
+  const px = await janela.webContents.executeJavaScript(`(async () => {
+    await Promise.all(Array.from(document.images).map(
+      img => img.complete ? null : img.decode().catch(() => null)));
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    return Math.ceil(Math.max(
+      document.body.scrollHeight, document.documentElement.scrollHeight));
+  })()`, true);
+  return Math.round(Number(px) * MICRA_POR_PX);
+}
+
+// O tamanho de página que vai junto com a impressão silenciosa.
+//
+// Sem ele, quem responde "de que tamanho é a página?" é o diálogo do Windows.
+// Silenciosa não abre diálogo, a térmica devolve papel "UNKNOWN", e o
+// Chromium monta um documento de ZERO página: o trabalho entra na fila com 0
+// bytes, o spooler descarta, e print() ainda chama de volta dizendo sucesso.
+// O balcão dava o cupom por impresso e nada saía do papel.
+function tamanhoDaPagina(larguraMM, alturaMicra) {
+  const largura = Math.round((Number(larguraMM) || 72) * 1000);
+  const altura = Math.round(Number(alturaMicra) || ALTURA_RESERVA_MICRA)
+    + SOBRA_MM * 1000;
+  return {
+    width: largura,
+    height: Math.min(Math.max(altura, 40 * 1000), 2000 * 1000)
+  };
+}
+
 function mandarCupom(pedido, opcoes, salvo, silencioso) {
   const nomeImpressora = opcoes.nomeImpressora ?? salvo.impressora;
   const larguraMM = opcoes.larguraMM ?? salvo.larguraMM;
@@ -64,7 +112,17 @@ function mandarCupom(pedido, opcoes, salvo, silencioso) {
     );
 
     // A tela do recibo avisa quando terminou de montar o conteúdo.
-    janela.webContents.ipc.once('recibo:pronto', () => {
+    janela.webContents.ipc.once('recibo:pronto', async () => {
+      // Medir ainda vale o prazo curto da montagem: faz parte de preparar.
+      let pageSize = null;
+      if (silencioso) {
+        try {
+          pageSize = tamanhoDaPagina(larguraMM, await medirAlturaMicra(janela));
+        } catch (erro) {
+          pageSize = tamanhoDaPagina(larguraMM, ALTURA_RESERVA_MICRA);
+        }
+      }
+
       // Montou: troca o prazo curto pelo longo, senão um diálogo de impressão
       // aberto por mais de 20 segundos fazia a janela morrer no meio.
       clearTimeout(redeDeSeguranca);
@@ -78,6 +136,8 @@ function mandarCupom(pedido, opcoes, salvo, silencioso) {
         printBackground: false,
         margins: { marginType: 'none' }
       };
+      // Só na silenciosa: com diálogo, quem escolhe o papel é a pessoa.
+      if (pageSize) opcoesImpressao.pageSize = pageSize;
       if (nomeImpressora) opcoesImpressao.deviceName = nomeImpressora;
 
       janela.webContents.print(opcoesImpressao, (sucesso, motivoFalha) => {

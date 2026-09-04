@@ -18,10 +18,23 @@
 
     body {
       margin: 0;
-      padding: 3mm 2mm;
+      /* Largura e recuo na MESMA caixa, e com box-sizing: border-box o recuo
+         entra para dentro em vez de somar. Foi isso que faltou no cupom do
+         ERP-Vendas, onde a largura estava numa caixa e o recuo na de fora: a
+         folha transbordava e o último dígito dos valores saía partido.
+
+         10mm em cima para o corte do papel não comer o nome da loja, 4mm de
+         lado — medido na POS80 da loja, que imprime até a borda dos 72mm. */
+      padding: 10mm 4mm 8mm;
       width: var(--largura-papel);
       font-family: "Courier New", monospace;
       font-size: 11px;
+      /* Tudo em negrito de propósito. Não é estilo: a térmica marca o papel
+         por pontos, e traço fino sai cinza — o cupom estava saindo apagado.
+         Courier New é uma fonte de traço fino, e no negrito ela engorda o
+         bastante para o preto fechar. Quem já tem font-weight próprio
+         (.loja, .total, .pix-*) não muda: negrito sobre negrito é o mesmo. */
+      font-weight: 700;
       line-height: 1.35;
       color: #000;
       background: #fff;
