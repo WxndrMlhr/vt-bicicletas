@@ -111,11 +111,11 @@
             'Tudo que foi feito depois dela — pedidos, clientes, movimentações — vai sumir.\n' +
             'Uma cópia do estado atual é guardada antes, por segurança.\n\n' +
             'O app vai fechar e abrir de novo. Continuar?';
-          if (!confirm(aviso)) return;
+          if (!await perguntar(aviso, { sim: 'Restaurar', perigo: true })) return;
           try {
             await window.erpAPI.backup.restaurar(arquivo);
           } catch (erro) {
-            alert(`Não deu para restaurar: ${motivo(erro)}`);
+            avisar(`Não deu para restaurar: ${motivo(erro)}`, 'erro');
           }
         });
       });
@@ -124,7 +124,7 @@
     document.getElementById('btn-fazer').addEventListener('click', async () => {
       const r = await window.erpAPI.backup.fazer();
       await carregar();
-      alert(r ? `Cópia feita: ${r.arquivo}` : 'Não havia banco de dados para copiar ainda.');
+      avisar(r ? `Cópia feita: ${r.arquivo}` : 'Não havia banco de dados para copiar ainda.');
     });
 
     document.getElementById('btn-pasta').addEventListener('click', () => {

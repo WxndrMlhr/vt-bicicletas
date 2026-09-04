@@ -155,7 +155,8 @@
       if (botao.dataset.acao === 'baixar') await window.erpAPI.financeiro.darBaixa(id);
       if (botao.dataset.acao === 'reabrir') await window.erpAPI.financeiro.reabrir(id);
       if (botao.dataset.acao === 'excluir') {
-        if (!confirm('Excluir esta conta a receber? O pedido continua no histórico.')) return;
+        if (!await perguntar('Excluir esta conta a receber?\n\nO pedido continua no histórico.',
+          { sim: 'Excluir', perigo: true })) return;
         await window.erpAPI.financeiro.excluir(id);
       }
       recarregar();

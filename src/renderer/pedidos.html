@@ -528,7 +528,7 @@
     // Salva o pedido novo ou grava as alterações do que está sendo editado.
     async function salvarPedidoAtual() {
       if (!ultimoCalculo || itens.length === 0) {
-        alert('Adicione pelo menos uma peça ao pedido.');
+        avisar('Adicione pelo menos uma peça ao pedido.', 'atencao');
         return null;
       }
       const dados = {
@@ -543,7 +543,7 @@
       if (!pedidoEditando) return await window.erpAPI.pedidos.salvar(dados);
 
       const r = await window.erpAPI.pedidos.atualizar(pedidoEditando, dados);
-      if (r && r.avisoConta) alert(r.avisoConta);
+      if (r && r.avisoConta) avisar(r.avisoConta, 'atencao');
       return pedidoEditando;
     }
 
@@ -566,9 +566,10 @@
       else limparTudo();
     }
 
-    document.getElementById('btn-limpar').addEventListener('click', () => {
+    document.getElementById('btn-limpar').addEventListener('click', async () => {
       if (pedidoEditando) {
-        if (!confirm('Sair sem gravar? O pedido continua como estava salvo.')) return;
+        if (!await perguntar('Sair sem gravar?\n\nO pedido continua como estava salvo.',
+            { sim: 'Sair' })) return;
         rascunho.limpar();
         location.href = 'historico.html';
         return;
@@ -580,7 +581,7 @@
       const total = ultimoCalculo?.total;
       const id = await salvarPedidoAtual();
       if (!id) return;
-      alert(pedidoEditando
+      avisar(pedidoEditando
         ? `Pedido #${id} atualizado. Total ${real(total)}.`
         : `Pedido #${id} salvo. Total ${real(total)}.`);
       encerrar();
@@ -598,7 +599,7 @@
       try {
         await window.erpAPI.pedidos.salvarPDF(id, { abrirDepois: true });
       } catch (erro) {
-        alert(`Pedido #${id} foi salvo, mas o PDF falhou:\n${motivo(erro)}`);
+        avisar(`Pedido #${id} foi salvo, mas o PDF falhou: ${motivo(erro)}`, 'erro');
       }
       botao.disabled = false;
       botao.textContent = 'Salvar e baixar PDF';
@@ -621,7 +622,7 @@
         try {
           await window.erpAPI.impressao.imprimir(id);
         } catch (erro) {
-          alert(`Pedido #${id} foi salvo, mas a impressão falhou:\n${motivo(erro)}`);
+          avisar(`Pedido #${id} foi salvo, mas a impressão falhou: ${motivo(erro)}`, 'erro');
         }
         encerrar();
       } finally {
@@ -668,12 +669,12 @@
         } else {
           const pedido = await window.erpAPI.pedidos.buscar(pedidoEditando);
           if (!pedido) {
-            alert(`Pedido #${pedidoEditando} não encontrado.`);
+            avisar(`Pedido #${pedidoEditando} não encontrado.`, 'erro');
             location.href = 'historico.html';
             return;
           }
           if (pedido.cancelado) {
-            alert(`O pedido #${pedidoEditando} está cancelado e não pode ser editado.`);
+            avisar(`O pedido #${pedidoEditando} está cancelado e não pode ser editado.`, 'erro');
             location.href = 'historico.html';
             return;
           }
@@ -692,7 +693,7 @@
           const perdidos = pedido.itens.length - itens.length;
           restaurando = false;
           if (perdidos > 0) {
-            alert(`${perdidos} ${perdidos === 1 ? 'item deste pedido não aponta' : 'itens deste pedido não apontam'} para uma peça cadastrada e ${perdidos === 1 ? 'ficou' : 'ficaram'} de fora da edição.`);
+            avisar(`${perdidos} ${perdidos === 1 ? 'item deste pedido não aponta' : 'itens deste pedido não apontam'} para uma peça cadastrada e ${perdidos === 1 ? 'ficou' : 'ficaram'} de fora da edição.`, 'atencao');
           }
         }
       } else if (guardado && (guardado.itens || []).length > 0) {

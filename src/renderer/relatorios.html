@@ -105,8 +105,8 @@
     }
 
     async function gerar() {
-      if (!inicioEl.value || !fimEl.value) { alert('Escolha as duas datas.'); return; }
-      if (inicioEl.value > fimEl.value) { alert('A data inicial vem antes da final.'); return; }
+      if (!inicioEl.value || !fimEl.value) { avisar('Escolha as duas datas.', 'atencao'); return; }
+      if (inicioEl.value > fimEl.value) { avisar('A data inicial vem antes da final.', 'atencao'); return; }
 
       const r = await window.erpAPI.relatorios.gerar(inicioEl.value, fimEl.value);
       const semVenda = 'Nenhuma venda nesse período.';

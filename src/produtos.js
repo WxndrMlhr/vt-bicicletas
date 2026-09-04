@@ -1,11 +1,13 @@
 const db = require('./db');
 
 function buscarProdutos(termo) {
+  // Sem acento dos dois lados: quem digita "camara" tem de achar "Câmara".
+  const like = `%${db.semAcento(termo)}%`;
   return db.prepare(`
     SELECT * FROM produtos
-    WHERE nome LIKE ? OR categoria LIKE ?
+    WHERE sem_acento(nome) LIKE ? OR sem_acento(categoria) LIKE ?
     ORDER BY nome
-  `).all(`%${termo}%`, `%${termo}%`);
+  `).all(like, like);
 }
 
 function listarProdutos() {

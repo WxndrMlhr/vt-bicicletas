@@ -55,11 +55,11 @@ function definirEstoqueMinimo(produto_id, minimo) {
 }
 
 function listarEstoque(filtro = '') {
-  const like = `%${filtro}%`;
+  const like = `%${db.semAcento(filtro)}%`;
   return db.prepare(`
     SELECT id, nome, categoria, estoque, estoque_minimo, preco_vista
     FROM produtos
-    WHERE nome LIKE ? OR categoria LIKE ?
+    WHERE sem_acento(nome) LIKE ? OR sem_acento(categoria) LIKE ?
     ORDER BY nome
   `).all(like, like);
 }

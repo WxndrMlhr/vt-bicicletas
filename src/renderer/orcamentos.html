@@ -579,7 +579,7 @@
     // Devolve o id do orçamento gravado, ou null se não deu para salvar.
     async function salvarOrcamentoAtual() {
       if (!ultimoCalculo || itens.length === 0) {
-        alert('Adicione pelo menos uma peça ao orçamento.');
+        avisar('Adicione pelo menos uma peça ao orçamento.', 'atencao');
         return null;
       }
       try {
@@ -590,7 +590,7 @@
         }
         return await window.erpAPI.orcamentos.salvar(dados);
       } catch (erro) {
-        alert(`Não deu para salvar o orçamento:\n${motivo(erro)}`);
+        avisar(`Não deu para salvar o orçamento: ${motivo(erro)}`, 'erro');
         return null;
       }
     }
@@ -645,7 +645,7 @@
       const eraEdicao = editandoId;
       const id = await salvarOrcamentoAtual();
       if (!id) return;
-      alert(eraEdicao
+      avisar(eraEdicao
         ? `Orçamento #${id} atualizado. Total ${real(total)}.`
         : `Orçamento #${id} salvo. Total ${real(total)}.`);
       await limparFormulario();
@@ -671,7 +671,7 @@
         if (r.cancelado) return false;
         return true;
       } catch (erro) {
-        alert(`O orçamento #${id} está salvo, mas o PDF falhou:\n${motivo(erro)}`);
+        avisar(`O orçamento #${id} está salvo, mas o PDF falhou: ${motivo(erro)}`, 'erro');
         return false;
       } finally {
         if (botao) { botao.disabled = false; botao.textContent = rotulo; }
@@ -892,7 +892,7 @@
         try {
           await window.erpAPI.orcamentos.imprimir(orcamento.id, { silencioso: false });
         } catch (erro) {
-          alert(`Não deu para imprimir: ${motivo(erro)}`);
+          avisar(`Não deu para imprimir: ${motivo(erro)}`, 'erro');
         }
         botao.disabled = false;
         botao.textContent = rotulo;
@@ -908,7 +908,7 @@
           await carregarLista();
           selecionar(orcamento.id);
         } catch (erro) {
-          alert(`Não deu para marcar: ${motivo(erro)}`);
+          avisar(`Não deu para marcar: ${motivo(erro)}`, 'erro');
         }
       });
 
@@ -918,7 +918,7 @@
           await carregarLista();
           selecionar(orcamento.id);
         } catch (erro) {
-          alert(`Não deu para reabrir: ${motivo(erro)}`);
+          avisar(`Não deu para reabrir: ${motivo(erro)}`, 'erro');
         }
       });
 
@@ -929,14 +929,14 @@
             `O pedido #${orcamento.pedido_id}, que já foi gerado, continua no sistema.\n` +
             'Só a proposta é apagada. Não tem como desfazer.'
           : `Apagar o orçamento #${orcamento.id}?\n\nNão tem como desfazer.`;
-        if (!confirm(aviso)) return;
+        if (!await perguntar(aviso, { sim: 'Apagar', perigo: true })) return;
         try {
           await window.erpAPI.orcamentos.excluir(orcamento.id);
           selecionado = null;
           await carregarLista();
           detalheEl.innerHTML = `<p class="vazio">Orçamento #${orcamento.id} apagado.</p>`;
         } catch (erro) {
-          alert(`Não deu para apagar: ${motivo(erro)}`);
+          avisar(`Não deu para apagar: ${motivo(erro)}`, 'erro');
         }
       });
 
@@ -953,7 +953,7 @@
           await carregarLista();
           selecionar(orcamento.id);
         } catch (erro) {
-          alert(`Não deu para prorrogar: ${motivo(erro)}`);
+          avisar(`Não deu para prorrogar: ${motivo(erro)}`, 'erro');
         }
       });
 
@@ -1031,13 +1031,13 @@
           });
           await carregarLista();
           await selecionar(orcamento.id);
-          alert(
-            `Orçamento #${r.orcamento_id} aprovado.\n\n` +
+          avisar(
+            `Orçamento #${r.orcamento_id} aprovado. ` +
             `Virou o pedido #${r.pedido_id}. As peças saíram do estoque` +
             (aPrazo ? ' e as parcelas estão em “A receber”.' : '.')
           );
         } catch (erro) {
-          alert(`Não deu para gerar o pedido:\n${motivo(erro)}`);
+          avisar(`Não deu para gerar o pedido: ${motivo(erro)}`, 'erro');
           botao.disabled = false;
         }
       });

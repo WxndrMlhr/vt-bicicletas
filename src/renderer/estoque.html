@@ -220,7 +220,7 @@
 
       document.getElementById('btn-ajustar').addEventListener('click', async () => {
         const saldo = Number(document.getElementById('m-saldo').value);
-        if (Number.isNaN(saldo)) { alert('Informe o saldo contado.'); return; }
+        if (Number.isNaN(saldo)) { avisar('Informe o saldo contado.', 'atencao'); return; }
         await window.erpAPI.estoque.ajustar(id, saldo, motivo() || 'Ajuste de contagem');
         recarregar();
       });

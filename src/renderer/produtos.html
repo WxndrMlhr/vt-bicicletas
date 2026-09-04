@@ -78,6 +78,49 @@
     const real = v => (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     const escapar = t => String(t ?? '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
 
+    // Recado dentro do painel, no lugar do alert().
+    //
+    // O alert() do Windows é modal e ENFILEIRA: clicar cinco vezes num
+    // formulário incompleto empilha cinco caixas para responder, e enquanto
+    // houver uma na fila a janela não aceita teclado. É assim que "faltou o
+    // preço" vira "o sistema travou e não consigo digitar".
+    function recado(texto, tipo = 'erro') {
+      let el = document.getElementById('painel-recado');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'painel-recado';
+        el.style.marginBottom = '0.9rem';
+        painelEl.prepend(el);
+      }
+      el.className = `aviso ${tipo}`;
+      el.textContent = texto;
+      el.style.display = texto ? 'block' : 'none';
+      if (texto) el.scrollIntoView({ block: 'nearest' });
+    }
+
+    // Roda a ação com o botão travado, e nunca deixa a falha em silêncio.
+    //
+    // Sem a trava, dois cliques rápidos gravavam a peça DUAS vezes — o
+    // `await` demora e nada impedia a segunda entrada. Sem o catch, o erro
+    // virava uma rejeição não tratada: o painel não mudava, nenhuma
+    // mensagem aparecia, e a tela parecia morta.
+    async function comTrava(botao, fn) {
+      if (botao.disabled) return;
+      const rotulo = botao.textContent;
+      botao.disabled = true;
+      botao.textContent = 'Aguarde...';
+      try {
+        await fn();
+      } catch (erro) {
+        recado(motivo(erro));
+      } finally {
+        // No finally: se o painel foi redesenhado no meio, este botão já
+        // não está na tela, e mexer nele não faz mal nenhum.
+        botao.disabled = false;
+        botao.textContent = rotulo;
+      }
+    }
+
     function renderizar(produtos) {
       produtosCarregados = produtos;
       document.getElementById('contagem').textContent =
@@ -168,15 +211,23 @@
         carregar();
       });
 
-      document.getElementById('f-salvar').addEventListener('click', async () => {
+      const botaoSalvar = document.getElementById('f-salvar');
+      botaoSalvar.addEventListener('click', () => comTrava(botaoSalvar, async () => {
         const nome = document.getElementById('f-nome').value.trim();
         const prazo = parseFloat(document.getElementById('f-prazo').value);
         const vista = parseFloat(document.getElementById('f-vista').value);
         const retiradaTexto = document.getElementById('f-retirada').value;
 
-        if (!nome) { alert('A peça precisa de um nome.'); return; }
+        // Validação vai para o painel, não para o alert: o que a pessoa
+        // precisa é ver o que falta enquanto olha o formulário.
+        if (!nome) {
+          recado('A peça precisa de um nome.', 'atencao');
+          document.getElementById('f-nome').focus();
+          return;
+        }
         if (Number.isNaN(prazo) || Number.isNaN(vista)) {
-          alert('Informe o preço a prazo e o preço à vista.');
+          recado('Informe o preço a prazo e o preço à vista.', 'atencao');
+          document.getElementById(Number.isNaN(prazo) ? 'f-prazo' : 'f-vista').focus();
           return;
         }
 
@@ -196,16 +247,18 @@
         await carregar();
         painelEl.innerHTML = `<p class="vazio">${editando ? 'Preço atualizado.' : 'Peça cadastrada.'}</p>`;
         selecionado = null;
-      });
+      }));
 
       if (editando) {
-        document.getElementById('f-excluir').addEventListener('click', async () => {
-          if (!confirm(`Excluir "${peca.nome}" da tabela?`)) return;
+        const botaoExcluir = document.getElementById('f-excluir');
+        botaoExcluir.addEventListener('click', () => comTrava(botaoExcluir, async () => {
+          if (!await perguntar(`Excluir "${peca.nome}" da tabela?`,
+              { sim: 'Excluir', perigo: true })) return;
           await window.erpAPI.produtos.excluir(peca.id);
           selecionado = null;
           painelEl.innerHTML = '<p class="vazio">Peça excluída.</p>';
-          carregar();
-        });
+          await carregar();
+        }));
       }
 
       document.getElementById('f-nome').focus();
@@ -280,14 +333,20 @@
         painelEl.innerHTML = '<p class="vazio">Clique numa peça para editar, ou use “Nova peça”.</p>';
       });
 
-      document.getElementById('r-aplicar').addEventListener('click', async () => {
+      const botaoAplicar = document.getElementById('r-aplicar');
+      botaoAplicar.addEventListener('click', () => comTrava(botaoAplicar, async () => {
         const perc = parseFloat(document.getElementById('r-percentual').value);
         const cat = document.getElementById('r-categoria').value;
-        if (!perc) { alert('Informe um percentual diferente de zero.'); return; }
+        if (!perc) {
+          recado('Informe um percentual diferente de zero.', 'atencao');
+          document.getElementById('r-percentual').focus();
+          return;
+        }
 
         const onde = cat || 'todas as peças';
         const acao = perc > 0 ? `aumentar ${perc}%` : `baixar ${Math.abs(perc)}%`;
-        if (!confirm(`Confirma ${acao} nos preços de ${onde}?\n\nNão tem como desfazer.`)) return;
+        if (!await perguntar(`Confirma ${acao} nos preços de ${onde}?\n\nNão tem como desfazer.`,
+            { sim: 'Reajustar', perigo: true })) return;
 
         const r = await window.erpAPI.produtos.reajustar(perc, cat);
         await carregar();
@@ -296,7 +355,7 @@
           <p style="font-size:0.9rem;">
             ${r.afetados} ${r.afetados === 1 ? 'peça teve' : 'peças tiveram'} o preço alterado em ${perc}%.
           </p>`;
-      });
+      }));
 
       atualizarPrevia();
     }
@@ -354,14 +413,15 @@
       painelEl.querySelectorAll('button[data-desfazer]').forEach(botao => {
         botao.addEventListener('click', async () => {
           const id = Number(botao.dataset.desfazer);
-          if (!confirm('Devolver os preços que existiam antes dessa alteração?')) return;
+          if (!await perguntar('Devolver os preços que existiam antes dessa alteração?',
+              { sim: 'Desfazer' })) return;
           try {
             const r = await window.erpAPI.produtos.desfazer(id);
             await carregar();
             await abrirAlteracoes();
-            alert(`Pronto. ${r.restaurados} ${r.restaurados === 1 ? 'peça voltou' : 'peças voltaram'} ao preço anterior.`);
+            avisar(`Pronto. ${r.restaurados} ${r.restaurados === 1 ? 'peça voltou' : 'peças voltaram'} ao preço anterior.`);
           } catch (erro) {
-            alert(`Não deu para desfazer: ${motivo(erro)}`);
+            avisar(`Não deu para desfazer: ${motivo(erro)}`, 'erro');
           }
         });
       });

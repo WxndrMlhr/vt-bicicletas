@@ -35,6 +35,29 @@ const db = new Database(dbPath);
 
 db.pragma('journal_mode = WAL');
 
+// Buscar sem depender de acento.
+//
+// O SQLite compara "câmara" e "camara" como palavras diferentes: ele só
+// sabe ignorar maiúscula em letra do inglês, e acento nenhum. Na prática
+// isso obriga quem atende no balcão a acertar o circunflexo com o cliente
+// esperando — e quem digita "camara" conclui que a peça não está
+// cadastrada.
+//
+// Uma função registrada aqui resolve para o banco inteiro sem coluna nova
+// e sem nada para manter em dia: quem grava não precisa saber que isto
+// existe. O preço é que a consulta lê todas as linhas em vez de usar
+// índice — com alguns milhares de peças é trabalho de microssegundos.
+//
+// O NFD separa a letra do acento; o intervalo apagado é o dos acentos
+// soltos. De quebra o "ç" vira "c", que mora nessa mesma faixa.
+const semAcento = t => String(t ?? '')
+  .normalize('NFD')
+  .replace(/[̀-ͯ]/g, '')
+  .toLowerCase();
+
+db.function('sem_acento', { deterministic: true, varargs: false },
+  (texto) => texto === null || texto === undefined ? null : semAcento(texto));
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS produtos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -270,3 +293,4 @@ if (cargaInicial.acao === 'semeado') {
 }
 
 module.exports = db;
+module.exports.semAcento = semAcento;

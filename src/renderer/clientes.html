@@ -150,7 +150,8 @@
 
       document.getElementById('btn-editar').addEventListener('click', () => abrirFormulario(c));
       document.getElementById('btn-excluir').addEventListener('click', async () => {
-        if (!confirm(`Excluir ${c.nome}? Os pedidos dele continuam no histórico, mas sem vínculo com o cliente.`)) return;
+        if (!await perguntar(`Excluir ${c.nome}?\n\nOs pedidos dele continuam no histórico, mas sem vínculo com o cliente.`,
+            { sim: 'Excluir', perigo: true })) return;
         await window.erpAPI.clientes.excluir(c.id);
         selecionado = null;
         fichaEl.innerHTML = '<p class="vazio">Cliente excluído.</p>';
@@ -203,7 +204,7 @@
           observacoes: document.getElementById('f-obs').value.trim()
         };
         if (!dados.nome) {
-          alert('O cliente precisa de um nome.');
+          avisar('O cliente precisa de um nome.', 'atencao');
           return;
         }
         if (editando) {

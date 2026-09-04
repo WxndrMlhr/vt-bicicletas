@@ -11,13 +11,17 @@ function listarClientes() {
 }
 
 function buscarClientes(termo) {
+  // Nome de gente é o que mais tem acento — e é o que se digita com
+  // pressa. "jose" tem de achar "José". Telefone não leva acento e vai
+  // como está.
   const like = `%${termo}%`;
+  const semAcento = `%${db.semAcento(termo)}%`;
   return db.prepare(`
     SELECT * FROM clientes
-    WHERE nome LIKE ? OR telefone LIKE ?
+    WHERE sem_acento(nome) LIKE ? OR telefone LIKE ?
     ORDER BY nome
     LIMIT 20
-  `).all(like, like);
+  `).all(semAcento, like);
 }
 
 function adicionarCliente({ nome, telefone, endereco, observacoes }) {

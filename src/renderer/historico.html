@@ -183,9 +183,9 @@
             mostrarDetalhe(await window.erpAPI.pedidos.buscar(pedido.id));
             let aviso = `Pedido #${r.pedido_id} cancelado. ${r.itensDevolvidos} ${r.itensDevolvidos === 1 ? 'item voltou' : 'itens voltaram'} ao estoque.`;
             if (r.avisoConta) aviso += `\n\nAtenção: ${r.avisoConta}`;
-            alert(aviso);
+            avisar(aviso);
           } catch (erro) {
-            alert(`Não deu para cancelar: ${motivo(erro)}`);
+            avisar(`Não deu para cancelar: ${motivo(erro)}`, 'erro');
           }
         });
       }
@@ -205,7 +205,7 @@
           'Ele some do histórico e dos relatórios, como se nunca tivesse existido.\n' +
           (pedido.cancelado ? '' : 'As peças voltam ao estoque e as cobranças são retiradas.\n') +
           '\nUse isso para limpar registros de teste. Não tem como desfazer.';
-        if (!confirm(aviso)) return;
+        if (!await perguntar(aviso, { sim: 'Apagar', perigo: true })) return;
 
         try {
           const r = await window.erpAPI.pedidos.excluir(pedido.id);
@@ -213,7 +213,7 @@
           await carregarLista();
           detalheEl.innerHTML = `<p class="vazio">Pedido #${r.pedido_id} apagado.</p>`;
         } catch (erro) {
-          alert(`Não deu para apagar: ${motivo(erro)}`);
+          avisar(`Não deu para apagar: ${motivo(erro)}`, 'erro');
         }
       });
 
@@ -225,7 +225,7 @@
         try {
           await window.erpAPI.pedidos.salvarPDF(pedido.id, { abrirDepois: true });
         } catch (erro) {
-          alert(`Não deu para gerar o PDF: ${motivo(erro)}`);
+          avisar(`Não deu para gerar o PDF: ${motivo(erro)}`, 'erro');
         }
         botao.disabled = false;
         botao.textContent = 'Baixar PDF';
@@ -238,7 +238,7 @@
         try {
           await window.erpAPI.impressao.imprimir(pedido.id);
         } catch (erro) {
-          alert(`Não deu para imprimir: ${motivo(erro)}`);
+          avisar(`Não deu para imprimir: ${motivo(erro)}`, 'erro');
         }
         botao.disabled = false;
         botao.textContent = 'Imprimir cupom';
