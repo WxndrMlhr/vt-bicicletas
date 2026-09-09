@@ -386,14 +386,20 @@
       }, 180);
     });
 
-    sugProdEl.addEventListener('click', (e) => {
-      const opcao = e.target.closest('.sugestao[data-id]');
-      if (!opcao) return;
+    // Uma função só, para o clique e as setas escolherem do mesmo jeito.
+    function escolherProduto(opcao) {
       adicionarItem(Number(opcao.dataset.id), opcao.dataset.nome);
       buscaEl.value = '';
       sugProdEl.style.display = 'none';
       buscaEl.focus();
+    }
+
+    sugProdEl.addEventListener('click', (e) => {
+      const opcao = e.target.closest('.sugestao[data-id]');
+      if (opcao) escolherProduto(opcao);
     });
+
+    TelaPedido.ligarSetas(buscaEl, sugProdEl, escolherProduto);
 
     // ---------- Busca de cliente ----------
     let tCliente;
@@ -415,14 +421,19 @@
       }, 180);
     });
 
-    sugCliEl.addEventListener('click', (e) => {
-      const opcao = e.target.closest('.sugestao[data-id]');
-      if (!opcao) return;
+    function escolherCliente(opcao) {
       clienteId = Number(opcao.dataset.id);
       clienteEl.value = opcao.dataset.nome;
       if (opcao.dataset.telefone) telefoneEl.value = opcao.dataset.telefone;
       sugCliEl.style.display = 'none';
+    }
+
+    sugCliEl.addEventListener('click', (e) => {
+      const opcao = e.target.closest('.sugestao[data-id]');
+      if (opcao) escolherCliente(opcao);
     });
+
+    TelaPedido.ligarSetas(clienteEl, sugCliEl, escolherCliente);
 
     document.addEventListener('click', (e) => {
       if (e.target !== buscaEl && !sugProdEl.contains(e.target)) sugProdEl.style.display = 'none';

@@ -121,5 +121,59 @@
     return faixa;
   }
 
-  window.TelaPedido = { pintarItens, criarRascunho, avisarRascunho };
+  // ---------- Setas na lista de sugestões ----------
+  //
+  // A lista nasceu só de mouse: para escolher, era preciso largar o teclado e
+  // clicar. Aqui as setas ↑ ↓ andam pela lista, Enter escolhe o que está
+  // marcado e Esc fecha.
+  //
+  // Nada fica marcado antes de a pessoa apertar a seta. No campo de cliente ela
+  // costuma digitar um nome novo que ainda não existe, e um item pré-marcado
+  // faria o Enter trocar o que ela acabou de escrever.
+  //
+  //   campo      -> o <input> onde se digita
+  //   caixa      -> a <div class="sugestoes"> logo abaixo dele
+  //   aoEscolher -> (elemento .sugestao escolhido) => o mesmo que o clique faz
+  function ligarSetas(campo, caixa, aoEscolher) {
+    let marcado = -1;
+
+    const opcoes = () => caixa.querySelectorAll('.sugestao[data-id]');
+
+    function marcar(i) {
+      const lista = opcoes();
+      if (lista.length === 0) { marcado = -1; return; }
+      marcado = Math.max(0, Math.min(i, lista.length - 1));
+      lista.forEach((o, n) => o.classList.toggle('marcada', n === marcado));
+      lista[marcado].scrollIntoView({ block: 'nearest' });
+    }
+
+    // Cada busca redesenha a lista inteira; a marca da lista anterior não vale
+    // mais, senão o Enter escolheria a linha errada.
+    new MutationObserver(() => { marcado = -1; }).observe(caixa, { childList: true });
+
+    campo.addEventListener('keydown', (e) => {
+      const lista = opcoes();
+      if (caixa.style.display === 'none' || lista.length === 0) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        marcar(marcado + 1);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        marcar(marcado < 0 ? lista.length - 1 : marcado - 1);
+      } else if (e.key === 'Enter') {
+        // Sem nada marcado o Enter continua sendo o de antes: quem digitou um
+        // cliente novo e apertou Enter não pode ver o nome virar outro.
+        if (marcado < 0) return;
+        e.preventDefault();
+        aoEscolher(lista[marcado]);
+        marcado = -1;
+      } else if (e.key === 'Escape') {
+        caixa.style.display = 'none';
+        marcado = -1;
+      }
+    });
+  }
+
+  window.TelaPedido = { pintarItens, criarRascunho, avisarRascunho, ligarSetas };
 })();

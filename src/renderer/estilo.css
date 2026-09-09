@@ -302,7 +302,12 @@ tr.selecionada td { border-bottom-color: #D3DFEC; }
 .barra { background: var(--sinal); height: 100%; }
 
 /* ---------- Busca com sugestões ---------- */
-.campo-busca { position: relative; }
+.campo-busca {
+  position: relative;
+  /* Sem isto o campo estica junto com a célula mais alta da linha, e o
+     dropdown (top: 100%) abre no fundo da célula em vez de sob o input. */
+  align-self: start;
+}
 .sugestoes {
   display: none;
   position: absolute;
@@ -326,6 +331,9 @@ tr.selecionada td { border-bottom-color: #D3DFEC; }
 }
 .sugestao:last-child { border-bottom: none; }
 .sugestao:hover { background: #F7F8F9; }
+/* A escolhida pelas setas, um tom mais forte que o do mouse para
+   continuar visível quando o cursor está parado sobre outra linha. */
+.sugestao.marcada { background: #F0F3F6; }
 .sugestao .apoio { color: var(--aco-500); font-family: var(--face-numero); font-size: 0.8rem; }
 
 /* ---------- Faixa de rascunho recuperado ---------- */
