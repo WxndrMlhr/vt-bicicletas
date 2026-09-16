@@ -19,26 +19,43 @@ function precoPorForma(produto, forma) {
   }
 }
 
+// Preço digitado na tela vale sobre o da tabela: é o valor negociado naquele
+// pedido, e só nele — o cadastro da peça em Produtos não muda. Vale zero
+// (peça de brinde); vazio, negativo ou texto é ignorado e a tabela prevalece.
+function precoDigitado(preco) {
+  const n = Number(preco);
+  return preco !== null && preco !== undefined && preco !== '' && Number.isFinite(n) && n >= 0
+    ? +n.toFixed(2)
+    : null;
+}
+
 // Calcula o pedido inteiro.
-// itens = [{ produto_id, quantidade }]
+// itens = [{ produto_id, quantidade, preco? }]  — preco é o unitário digitado
+// na tela, quando a pessoa trocou o valor da tabela só para este pedido.
 //
 // Regra dos R$ 2.000: primeiro calcula o total com a forma de pagamento escolhida.
 // Se esse total atingir R$ 2.000, o pedido é recalculado com o preço de retirada
 // (o mais vantajoso), porque nessa faixa a entrega é grátis / retirada vale o desconto.
+// Linha com preço digitado não entra nessa troca: o valor negociado fica como está.
 function calcularPedido(itens, formaPagamento) {
   const buscarProduto = db.prepare('SELECT * FROM produtos WHERE id = ?');
 
   function montar(forma) {
-    const linhas = itens.map(({ produto_id, quantidade }) => {
+    const linhas = itens.map(({ produto_id, quantidade, preco }) => {
       const produto = buscarProduto.get(produto_id);
       if (!produto) throw new Error(`Produto não encontrado: id ${produto_id}`);
-      const preco_unitario = precoPorForma(produto, forma);
+      const preco_tabela = precoPorForma(produto, forma);
+      const manual = precoDigitado(preco);
+      const preco_unitario = manual ?? preco_tabela;
       return {
         produto_id: produto.id,
         nome: produto.nome,
         quantidade,
         preco_unitario,
         subtotal: +(preco_unitario * quantidade).toFixed(2),
+        // Para a tela mostrar de onde veio o valor e qual era o da tabela
+        preco_tabela,
+        preco_manual: manual !== null,
         // Informativo: quanto existe em estoque e se dá para atender
         estoque_atual: produto.estoque ?? 0,
         falta: quantidade - (produto.estoque ?? 0),

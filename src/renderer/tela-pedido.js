@@ -31,8 +31,28 @@
       atuais.length === linhas.length &&
       atuais.every((tr, i) => tr.dataset.linha === String(linhas[i].produto_id));
 
+    // Cada célula lembra o HTML que recebeu. Comparar com o innerHTML não
+    // serve: o navegador devolve "R$&nbsp;38,00" para o "R$ 38,00" que foi
+    // escrito, a comparação falhava sempre e a célula era reescrita a cada
+    // recálculo — o que engolia o clique num botão dentro dela.
+    function pintarCelulas(tr, linha) {
+      const partes = celulas ? celulas(linha) : {};
+      for (const nome of Object.keys(partes)) {
+        const celula = tr.querySelector(`[data-c="${nome}"]`);
+        if (!celula) continue;
+        // Só mexe no que mudou: escrever igual por cima faz a tela piscar.
+        if (celula.__pintado !== partes[nome]) {
+          celula.innerHTML = partes[nome];
+          celula.__pintado = partes[nome];
+        }
+      }
+    }
+
     if (!mesmasPecas) {
       tbody.innerHTML = linhas.map(montarLinha).join('');
+      // A linha recém-montada já nasce com as células certas; registra isso
+      // para o próximo recálculo não reescrever à toa.
+      tbody.querySelectorAll('tr[data-linha]').forEach((tr, i) => pintarCelulas(tr, linhas[i]));
       return;
     }
 
@@ -40,22 +60,42 @@
 
     linhas.forEach((linha, i) => {
       const tr = atuais[i];
-      const partes = celulas ? celulas(linha) : {};
+      pintarCelulas(tr, linha);
 
-      for (const nome of Object.keys(partes)) {
-        const celula = tr.querySelector(`[data-c="${nome}"]`);
-        // Só mexe no que mudou: escrever igual por cima faz a tela piscar.
-        if (celula && celula.innerHTML !== partes[nome]) celula.innerHTML = partes[nome];
-      }
-
-      // O campo de quantidade é o único que a pessoa digita, então só é
-      // corrigido quando não é ele que está em uso — senão o número pularia
-      // embaixo do dedo de quem está escrevendo.
+      // Os campos que a pessoa digita (quantidade e, no atacado, o preço) só
+      // são corrigidos quando não é neles que ela está — senão o número
+      // pularia embaixo do dedo de quem está escrevendo.
       const campo = tr.querySelector('input.qtd');
       if (campo && campo !== focado && campo.value !== String(linha.quantidade)) {
         campo.value = linha.quantidade;
       }
+      const preco = tr.querySelector('input.preco');
+      if (preco && preco !== focado) {
+        const texto = precoParaCampo(linha.preco_unitario);
+        if (preco.value !== texto) preco.value = texto;
+      }
     });
+  }
+
+  // ---------- Campo de preço ----------
+  //
+  // O preço é digitado como se escreve no papel: "34,50". Um <input
+  // type="number"> depende do idioma do sistema para aceitar vírgula ou ponto,
+  // então o campo é de texto e a conversão é feita aqui, nos dois sentidos.
+  function precoParaCampo(valor) {
+    return (Number(valor) || 0).toFixed(2).replace('.', ',');
+  }
+
+  // Devolve o número digitado, ou null se o campo está vazio ou não é número.
+  // Aceita "34,50", "34.50", "1.234,50" e "1.200" (ponto seguido de três
+  // dígitos, sem vírgula, é milhar — como se escreve preço de bicicleta).
+  function precoDoCampo(texto) {
+    let t = String(texto ?? '').replace(/[R$\s]/g, '');
+    if (t === '') return null;
+    if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+    else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
+    const n = Number(t);
+    return Number.isFinite(n) && n >= 0 ? +n.toFixed(2) : null;
   }
 
   // ---------- Rascunho ----------
@@ -175,5 +215,5 @@
     });
   }
 
-  window.TelaPedido = { pintarItens, criarRascunho, avisarRascunho, ligarSetas };
+  window.TelaPedido = { pintarItens, criarRascunho, avisarRascunho, ligarSetas, precoParaCampo, precoDoCampo };
 })();

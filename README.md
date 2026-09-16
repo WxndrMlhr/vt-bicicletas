@@ -63,6 +63,14 @@ peça em Produtos e voltar não zera o que já estava montado: o balcão, o pedi
 atacado e o orçamento guardam o rascunho e o repõem quando a tela reabre, com
 uma faixa avisando e um botão para descartar. O rascunho vale por 12 horas.
 
+**Preço negociado vale só naquele pedido.** No Pedido atacado, o valor unitário
+de cada linha é um campo editável: digitar outro preço (ou zero, para brinde)
+recalcula subtotal, total e parcelas na hora. O campo fica marcado, mostra o
+preço da tabela e tem um "voltar". Isso não altera o cadastro da peça em
+Produtos — é o preço combinado para aquela venda, e é ele que vai para o cupom,
+o PDF e o histórico. Ao reabrir o pedido para edição, a linha cujo preço salvo
+não bate com a tabela continua com o valor negociado.
+
 **Pedido salvo pode ser editado.** Em Pedidos, o botão "Editar pedido" reabre a
 venda na tela de atacado. Gravar substitui o pedido no mesmo número: as peças da
 versão anterior voltam ao estoque, as novas são baixadas e as cobranças em

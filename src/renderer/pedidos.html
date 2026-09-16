@@ -47,6 +47,33 @@
       transform: translateY(-3px);
     }
     #tabela-itens input.qtd { width: 62px; padding: 0.28rem 0.35rem; }
+    /* Preço unitário: editável só para este pedido, o cadastro da peça não muda */
+    #tabela-itens input.preco {
+      width: 96px;
+      padding: 0.28rem 0.35rem;
+      font-family: var(--face-numero);
+      text-align: right;
+    }
+    #tabela-itens input.preco.negociado {
+      border-color: var(--oxido);
+      background: #FFF9F4;
+    }
+    .preco-tabela {
+      font-size: 0.72rem;
+      color: var(--aco-500);
+      margin-top: 0.2rem;
+      white-space: nowrap;
+    }
+    .preco-tabela button {
+      background: none;
+      border: 0;
+      padding: 0;
+      margin-left: 0.3rem;
+      font-size: inherit;
+      color: var(--oxido);
+      cursor: pointer;
+      text-decoration: underline;
+    }
 
     .atalhos-prazo { display: flex; gap: 0.3rem; margin-top: 0.35rem; }
     .atalhos-prazo button { flex: 1; padding: 0.28rem 0.2rem; font-size: 0.75rem; }
@@ -142,7 +169,7 @@
           <tr>
             <th>Peça</th>
             <th class="num" style="width: 90px;">Qtd</th>
-            <th class="num" style="width: 110px;">Unitário</th>
+            <th class="num" style="width: 130px;">Unitário</th>
             <th class="num" style="width: 120px;">Subtotal</th>
             <th style="width: 1%;"></th>
           </tr>
@@ -172,7 +199,7 @@
   </main>
 
   <script>
-    let itens = [];              // [{ produto_id, nome, quantidade }]
+    let itens = [];              // [{ produto_id, nome, quantidade, preco? }] — preco só quando foi digitado
     let ultimoCalculo = null;
     let clienteId = null;        // preenchido quando escolhe um cliente cadastrado
     let cacheProdutos = null;
@@ -315,6 +342,23 @@
       if (item) { item.quantidade = Math.max(1, quantidade); recalcular(); }
     }
 
+    // Preço digitado vale só para este pedido: o cadastro em Produtos não muda.
+    // null volta para o preço da tabela.
+    function alterarPreco(produto_id, preco) {
+      const item = itens.find(i => i.produto_id === produto_id);
+      if (!item) return;
+      if (preco === null) delete item.preco;
+      else item.preco = preco;
+      recalcular();
+    }
+
+    // Abaixo do campo: de onde veio o valor. Com preço digitado, mostra o da
+    // tabela e um atalho para voltar a ele.
+    function celulaPrecoTabela(l) {
+      if (!l.preco_manual) return '';
+      return `tabela ${real(l.preco_tabela)}<button type="button" data-tabela="${l.produto_id}">voltar</button>`;
+    }
+
     // Guarda o pedido em montagem, para ele sobreviver à troca de tela.
     function guardarRascunho() {
       if (restaurando) return;
@@ -347,7 +391,7 @@
       // pode chegar depois de uma nova e escrever número velho na tela.
       const meuPedido = ++sequenciaCalculo;
       const r = await window.erpAPI.pedidos.calcular(
-        itens.map(({ produto_id, quantidade }) => ({ produto_id, quantidade })),
+        itens.map(({ produto_id, quantidade, preco }) => ({ produto_id, quantidade, preco })),
         formaEl.value
       );
       if (meuPedido !== sequenciaCalculo) return;
@@ -361,15 +405,25 @@
             <td class="num">
               <input type="number" class="qtd" min="1" value="${l.quantidade}" data-id="${l.produto_id}">
             </td>
-            <td class="num" data-c="unitario">${real(l.preco_unitario)}</td>
+            <td class="num">
+              <input type="text" inputmode="decimal" class="preco${l.preco_manual ? ' negociado' : ''}"
+                     value="${TelaPedido.precoParaCampo(l.preco_unitario)}" data-id="${l.produto_id}"
+                     title="Preço só para este pedido. O cadastro da peça não muda.">
+              <div class="preco-tabela" data-c="tabela">${celulaPrecoTabela(l)}</div>
+            </td>
             <td class="num" data-c="subtotal" style="font-weight:700;">${real(l.subtotal)}</td>
             <td><button class="perigo mini" data-remover="${l.produto_id}">Tirar</button></td>
           </tr>`,
         celulas: l => ({
           nome: celulaNome(l),
-          unitario: real(l.preco_unitario),
+          tabela: celulaPrecoTabela(l),
           subtotal: real(l.subtotal)
         })
+      });
+
+      r.linhas.forEach(l => {
+        const campo = itensEl.querySelector(`input.preco[data-id="${l.produto_id}"]`);
+        if (campo) campo.classList.toggle('negociado', !!l.preco_manual);
       });
 
       totalEl.textContent = real(r.total);
@@ -437,9 +491,48 @@
       alterarQuantidade(Number(e.target.dataset.id), quantidade);
     });
 
+    // Preço digitado: mesma pausa curta da quantidade. Enquanto o texto ainda
+    // não é um número (só "34," por exemplo), espera a pessoa terminar.
+    let tPreco;
+    itensEl.addEventListener('input', (e) => {
+      if (!e.target.classList.contains('preco')) return;
+      const id = Number(e.target.dataset.id);
+      const preco = TelaPedido.precoDoCampo(e.target.value);
+      if (preco === null) return;
+      clearTimeout(tPreco);
+      tPreco = setTimeout(() => alterarPreco(id, preco), 250);
+    });
+
+    // Ao sair do campo: campo vazio ou inválido volta para o preço da tabela,
+    // e o que ficou é reescrito no formato "34,50".
+    itensEl.addEventListener('change', (e) => {
+      if (!e.target.classList.contains('preco')) return;
+      clearTimeout(tPreco);
+      const preco = TelaPedido.precoDoCampo(e.target.value);
+      if (preco !== null) e.target.value = TelaPedido.precoParaCampo(preco);
+      alterarPreco(Number(e.target.dataset.id), preco);
+    });
+
+    // Enter no preço: confirma e volta para a busca, para seguir adicionando.
+    itensEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.target.classList.contains('preco')) {
+        e.preventDefault();
+        e.target.blur();
+        buscaEl.focus();
+      }
+    });
+
     itensEl.addEventListener('click', (e) => {
       const botao = e.target.closest('button[data-remover]');
       if (botao) removerItem(Number(botao.dataset.remover));
+      const voltar = e.target.closest('button[data-tabela]');
+      if (voltar) {
+        // O campo em foco não é reescrito pelo redesenho; solta o foco antes.
+        if (document.activeElement && document.activeElement.classList.contains('preco')) {
+          document.activeElement.blur();
+        }
+        alterarPreco(Number(voltar.dataset.tabela), null);
+      }
     });
 
     // ---------- Forma de pagamento ----------
@@ -690,12 +783,25 @@
             return;
           }
           restaurando = true;
-          itens = pedido.itens
-            .filter(i => i.produto_id)
-            .map(i => ({ produto_id: i.produto_id, nome: i.nome, quantidade: i.quantidade }));
+          const salvos = pedido.itens.filter(i => i.produto_id);
+          itens = salvos.map(i => ({ produto_id: i.produto_id, nome: i.nome, quantidade: i.quantidade }));
           clienteEl.value = pedido.cliente || '';
           clienteId = pedido.cliente_id ?? null;
           formaEl.value = pedido.forma_pagamento === 'balcao' ? 'vista' : pedido.forma_pagamento;
+
+          // Linha cujo preço salvo não bate com o da tabela foi negociada na
+          // época: o valor digitado é mantido em vez de voltar para a tabela.
+          if (itens.length > 0) {
+            const base = await window.erpAPI.pedidos.calcular(
+              itens.map(({ produto_id, quantidade }) => ({ produto_id, quantidade })),
+              formaEl.value
+            );
+            base.linhas.forEach((l, i) => {
+              if (Math.abs(l.preco_unitario - salvos[i].preco_unitario) >= 0.005) {
+                itens[i].preco = +salvos[i].preco_unitario.toFixed(2);
+              }
+            });
+          }
           const emAberto = (pedido.parcelas || []).filter(p => !p.pago);
           if (emAberto.length > 0) {
             qtdParcelasEl.value = emAberto.length;
