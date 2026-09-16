@@ -142,6 +142,14 @@ ipcMain.handle('impressao:imprimir', (event, pedidoId, opcoes) => {
   return impressao.imprimirPedido(pedido, opcoes || {});
 });
 
+// A versão que a tela mostra.
+//
+// Vem do package.json e não de `app.getVersion()`: fora do app empacotado o
+// getVersion() devolve a versão do Electron, e o número na tela passaria a
+// mentir justamente quando estou testando aqui.
+const versaoApp = require('../package.json').version;
+ipcMain.handle('app:versao', () => versaoApp);
+
 ipcMain.handle('impressao:listar', () => impressao.listarImpressoras());
 
 ipcMain.handle('impressao:papeis', (e, nomeImpressora) =>
@@ -149,6 +157,11 @@ ipcMain.handle('impressao:papeis', (e, nomeImpressora) =>
 
 // Impressão de teste: usa um pedido de mentira, sem tocar no banco,
 // para conferir largura e impressora antes de valer numa venda.
+//
+// Vai com `comPix` ligado. O exemplo abaixo é uma venda de balcão, que no uso
+// normal sai sem o bloco de PIX — mas aqui o que se está conferindo é a folha
+// inteira, e o QR é a peça mais baixa do cupom: sem ele, o teste não mostra
+// onde o papel vai ser cortado.
 ipcMain.handle('impressao:teste', (e, opcoes) => {
   const exemplo = {
     id: 0,
@@ -162,7 +175,7 @@ ipcMain.handle('impressao:teste', (e, opcoes) => {
       { nome: 'Peça curta', quantidade: 1, preco_unitario: 33.45, subtotal: 33.45 }
     ]
   };
-  return impressao.imprimirPedido(exemplo, opcoes || {});
+  return impressao.imprimirPedido(exemplo, { comPix: true, ...(opcoes || {}) });
 });
 
 // --- Configurações ---

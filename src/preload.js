@@ -4,7 +4,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 // poderá chamar com segurança: cadastrar produto, criar pedido,
 // imprimir na mini impressora, consultar estoque, etc.
 contextBridge.exposeInMainWorld('erpAPI', {
-  versaoApp: () => process.versions.electron,
+  // Devolvia `process.versions.electron`, ou seja, a versão do Electron com
+  // nome de versão do app. Ninguém usava, e usar daria número errado.
+  versao: () => ipcRenderer.invoke('app:versao'),
 
   produtos: {
     listar: () => ipcRenderer.invoke('produtos:listar'),

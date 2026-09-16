@@ -131,7 +131,22 @@ window.perguntar = function (texto, { sim = 'Confirmar', nao = 'Cancelar', perig
         <div class="desc">Controle da loja</div>
       </div>
       <nav>${links}</nav>
-      <div class="menu-rodape">Nova Iguaçu / RJ</div>
+      <div class="menu-rodape">
+        Nova Iguaçu / RJ
+        <span class="versao" id="menu-versao"></span>
+      </div>
     </aside>
   `);
+
+  // A versão fica à vista, e não escondida numa tela de diagnóstico: no
+  // suporte a primeira pergunta é sempre "qual versão você está usando?".
+  //
+  // Preenchida depois porque o menu é escrito com document.write, que é
+  // síncrono, e a versão vem por IPC.
+  window.erpAPI?.versao?.()
+    .then(v => {
+      const el = document.getElementById('menu-versao');
+      if (el) el.textContent = 'v' + v;
+    })
+    .catch(() => { /* sem a versão o menu continua servindo */ });
 })();

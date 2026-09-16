@@ -152,11 +152,26 @@ function mandarCupom(pedido, opcoes, salvo, silencioso) {
     janela.webContents.once('did-finish-load', () => {
       // O bloco de pagamento vai montado daqui: o cupom não precisa saber
       // desenhar QR, e o mesmo código serve para a folha A4.
+      //
+      // No balcão ele não sai. O cliente pagou na hora e está indo embora:
+      // um QR de "pague por PIX" no comprovante dele não serve para nada —
+      // serve no orçamento e no pedido a prazo, que é quem paga depois.
+      //
+      // A regra olha a forma de pagamento, e não a tela que mandou imprimir,
+      // para a reimpressão pelo Histórico sair igual à primeira via. É o
+      // mesmo documento; sair diferente conforme o caminho é defeito.
+      //
+      // A impressão de teste força `comPix` porque é justamente nela que se
+      // confere a altura do cupom inteiro, com o QR no pé.
+      const comPix = opcoes.comPix ?? (pedido.forma_pagamento !== 'balcao');
+
       let pagamento = null;
-      try {
-        pagamento = require('./pagamento').dados();
-      } catch (erro) {
-        console.error('[impressao] cupom sem bloco de pagamento:', erro.message);
+      if (comPix) {
+        try {
+          pagamento = require('./pagamento').dados();
+        } catch (erro) {
+          console.error('[impressao] cupom sem bloco de pagamento:', erro.message);
+        }
       }
       janela.webContents.send('recibo:dados', pedido, { larguraMM, pagamento });
     });

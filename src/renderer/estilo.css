@@ -100,6 +100,13 @@ body {
   color: var(--aco-700);
   border-top: 1px solid #262B33;
 }
+.menu-rodape .versao {
+  display: block;
+  margin-top: 0.2rem;
+  font-family: var(--face-numero);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+}
 
 /* ---------- Área de conteúdo ---------- */
 .conteudo {
