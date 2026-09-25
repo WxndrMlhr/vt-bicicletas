@@ -131,7 +131,7 @@
           <div class="atalhos-prazo">
             <button type="button" class="neutro mini" data-intervalo="7">Semanal</button>
             <button type="button" class="neutro mini" data-intervalo="15">Quinzenal</button>
-            <button type="button" class="neutro mini" data-intervalo="30">Mensal</button>
+            <button type="button" class="neutro mini escolhido" data-intervalo="30">Mensal</button>
           </div>
         </div>
       </div>
@@ -157,7 +157,7 @@
         <tbody id="linhas-parcelas"></tbody>
       </table>
       <div style="font-size:0.8rem; color:var(--aco-500); margin-top:0.5rem;">
-        As datas podem ser alteradas uma a uma. O valor é dividido igualmente.
+        Mudou a data de uma parcela? As seguintes acompanham, no mesmo intervalo. O valor é dividido igualmente.
       </div>
     </div>
 
@@ -325,27 +325,27 @@
           : '');
     }
 
+    // As linhas são pela posição (i): a mesma peça pode estar em várias
+    // linhas, uma por cor.
     function adicionarItem(produto_id, nome) {
-      const existente = itens.find(i => i.produto_id === produto_id);
-      if (existente) existente.quantidade += 1;
-      else itens.push({ produto_id, nome, quantidade: 1 });
+      TelaPedido.adicionarPeca(itens, produto_id, nome);
       recalcular();
     }
 
-    function removerItem(produto_id) {
-      itens = itens.filter(i => i.produto_id !== produto_id);
+    function removerItem(i) {
+      itens = itens.filter((_, n) => n !== i);
       recalcular();
     }
 
-    function alterarQuantidade(produto_id, quantidade) {
-      const item = itens.find(i => i.produto_id === produto_id);
+    function alterarQuantidade(i, quantidade) {
+      const item = itens[i];
       if (item) { item.quantidade = Math.max(1, quantidade); recalcular(); }
     }
 
     // Preço digitado vale só para este pedido: o cadastro em Produtos não muda.
     // null volta para o preço da tabela.
-    function alterarPreco(produto_id, preco) {
-      const item = itens.find(i => i.produto_id === produto_id);
+    function alterarPreco(i, preco) {
+      const item = itens[i];
       if (!item) return;
       if (preco === null) delete item.preco;
       else item.preco = preco;
@@ -354,9 +354,9 @@
 
     // Abaixo do campo: de onde veio o valor. Com preço digitado, mostra o da
     // tabela e um atalho para voltar a ele.
-    function celulaPrecoTabela(l) {
+    function celulaPrecoTabela(l, i) {
       if (!l.preco_manual) return '';
-      return `tabela ${real(l.preco_tabela)}<button type="button" data-tabela="${l.produto_id}">voltar</button>`;
+      return `tabela ${real(l.preco_tabela)}<button type="button" data-tabela="${i}">voltar</button>`;
     }
 
     // Guarda o pedido em montagem, para ele sobreviver à troca de tela.
@@ -370,6 +370,7 @@
         forma: formaEl.value,
         qtdParcelas: qtdParcelasEl.value,
         intervalo: intervaloEscolhido,
+        primeiraData,
         parcelas
       });
     }
@@ -391,7 +392,7 @@
       // pode chegar depois de uma nova e escrever número velho na tela.
       const meuPedido = ++sequenciaCalculo;
       const r = await window.erpAPI.pedidos.calcular(
-        itens.map(({ produto_id, quantidade, preco }) => ({ produto_id, quantidade, preco })),
+        itens.map(({ produto_id, quantidade, preco, cor }) => ({ produto_id, quantidade, preco, cor })),
         formaEl.value
       );
       if (meuPedido !== sequenciaCalculo) return;
@@ -399,30 +400,33 @@
 
       TelaPedido.pintarItens(itensEl, r.linhas, {
         vazio: '<tr><td colspan="5" class="vazio">Nenhuma peça ainda. Use o campo acima para adicionar.</td></tr>',
-        montarLinha: l => `
+        montarLinha: (l, i) => `
           <tr data-linha="${l.produto_id}">
-            <td data-c="nome">${celulaNome(l)}</td>
+            <td>
+              <div data-c="nome">${celulaNome(l)}</div>
+              ${TelaPedido.seletorCor(l, i)}
+            </td>
             <td class="num">
-              <input type="number" class="qtd" min="1" value="${l.quantidade}" data-id="${l.produto_id}">
+              <input type="number" class="qtd" min="1" value="${l.quantidade}" data-i="${i}">
             </td>
             <td class="num">
               <input type="text" inputmode="decimal" class="preco${l.preco_manual ? ' negociado' : ''}"
-                     value="${TelaPedido.precoParaCampo(l.preco_unitario)}" data-id="${l.produto_id}"
+                     value="${TelaPedido.precoParaCampo(l.preco_unitario)}" data-i="${i}"
                      title="Preço só para este pedido. O cadastro da peça não muda.">
-              <div class="preco-tabela" data-c="tabela">${celulaPrecoTabela(l)}</div>
+              <div class="preco-tabela" data-c="tabela">${celulaPrecoTabela(l, i)}</div>
             </td>
             <td class="num" data-c="subtotal" style="font-weight:700;">${real(l.subtotal)}</td>
-            <td><button class="perigo mini" data-remover="${l.produto_id}">Tirar</button></td>
+            <td><button class="perigo mini" data-remover="${i}">Tirar</button></td>
           </tr>`,
-        celulas: l => ({
+        celulas: (l, i) => ({
           nome: celulaNome(l),
-          tabela: celulaPrecoTabela(l),
+          tabela: celulaPrecoTabela(l, i),
           subtotal: real(l.subtotal)
         })
       });
 
-      r.linhas.forEach(l => {
-        const campo = itensEl.querySelector(`input.preco[data-id="${l.produto_id}"]`);
+      r.linhas.forEach((l, i) => {
+        const campo = itensEl.querySelector(`input.preco[data-i="${i}"]`);
         if (campo) campo.classList.toggle('negociado', !!l.preco_manual);
       });
 
@@ -475,7 +479,7 @@
     let tQtd;
     itensEl.addEventListener('input', (e) => {
       if (!e.target.classList.contains('qtd')) return;
-      const id = Number(e.target.dataset.id);
+      const id = Number(e.target.dataset.i);
       const escrito = e.target.value;
       if (escrito === '') return;
       clearTimeout(tQtd);
@@ -488,7 +492,7 @@
       clearTimeout(tQtd);
       const quantidade = Math.max(1, Math.floor(Number(e.target.value) || 1));
       e.target.value = quantidade;
-      alterarQuantidade(Number(e.target.dataset.id), quantidade);
+      alterarQuantidade(Number(e.target.dataset.i), quantidade);
     });
 
     // Preço digitado: mesma pausa curta da quantidade. Enquanto o texto ainda
@@ -496,7 +500,7 @@
     let tPreco;
     itensEl.addEventListener('input', (e) => {
       if (!e.target.classList.contains('preco')) return;
-      const id = Number(e.target.dataset.id);
+      const id = Number(e.target.dataset.i);
       const preco = TelaPedido.precoDoCampo(e.target.value);
       if (preco === null) return;
       clearTimeout(tPreco);
@@ -510,7 +514,7 @@
       clearTimeout(tPreco);
       const preco = TelaPedido.precoDoCampo(e.target.value);
       if (preco !== null) e.target.value = TelaPedido.precoParaCampo(preco);
-      alterarPreco(Number(e.target.dataset.id), preco);
+      alterarPreco(Number(e.target.dataset.i), preco);
     });
 
     // Enter no preço: confirma e volta para a busca, para seguir adicionando.
@@ -522,9 +526,22 @@
       }
     });
 
+    // Cor escolhida na linha. Escolher uma cor que outra linha da mesma peça
+    // já tem junta as duas.
+    itensEl.addEventListener('change', (e) => {
+      if (!e.target.classList.contains('cor')) return;
+      itens = TelaPedido.trocarCor(itens, Number(e.target.dataset.i), e.target.value);
+      recalcular();
+    });
+
     itensEl.addEventListener('click', (e) => {
       const botao = e.target.closest('button[data-remover]');
       if (botao) removerItem(Number(botao.dataset.remover));
+      const outra = e.target.closest('button[data-outra-cor]');
+      if (outra) {
+        itens = TelaPedido.outraCor(itens, Number(outra.dataset.outraCor));
+        recalcular();
+      }
       const voltar = e.target.closest('button[data-tabela]');
       if (voltar) {
         // O campo em foco não é reescrito pelo redesenho; solta o foco antes.
@@ -537,18 +554,15 @@
 
     // ---------- Forma de pagamento ----------
     // ---------- Parcelamento ----------
-    // parcelas = [{ vencimento, valor }] — as datas ficam editáveis uma a uma.
+    // parcelas = [{ vencimento, valor }] — as datas ficam editáveis uma a uma,
+    // e mudar uma leva as seguintes junto.
     let parcelas = [];
     let intervaloEscolhido = 30;
+    let primeiraData = null;     // data que a pessoa escolheu para a 1ª parcela
 
     const painelParcelasEl = document.getElementById('painel-parcelas');
     const linhasParcelasEl = document.getElementById('linhas-parcelas');
     const qtdParcelasEl = document.getElementById('qtd-parcelas');
-
-    function dataISO(d) {
-      const p = n => String(n).padStart(2, '0');
-      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-    }
 
     // Divide o total em centavos exatos; a sobra vai para a última parcela.
     function dividirValor(total, quantidade) {
@@ -563,18 +577,13 @@
       const total = ultimoCalculo ? ultimoCalculo.total : 0;
       const valores = dividirValor(total, quantidade);
 
-      const datasAnteriores = parcelas.map(p => p.vencimento);
-      parcelas = valores.map((valor, i) => {
-        let vencimento;
-        if (manterDatas && datasAnteriores[i]) {
-          vencimento = datasAnteriores[i];
-        } else {
-          const d = new Date();
-          d.setDate(d.getDate() + intervaloEscolhido * (i + 1));
-          vencimento = dataISO(d);
-        }
-        return { vencimento, valor };
-      });
+      // Mantendo: as datas que já estão na tela ficam, e parcela nova segue a
+      // última. Sem manter (trocou o intervalo): tudo sai de novo a partir da
+      // data escolhida para a 1ª parcela, ou de hoje.
+      const datas = manterDatas && parcelas.length > 0
+        ? TelaPedido.estenderDatas(parcelas.map(p => p.vencimento), quantidade, intervaloEscolhido)
+        : TelaPedido.datasDasParcelas(quantidade, intervaloEscolhido, primeiraData);
+      parcelas = valores.map((valor, i) => ({ vencimento: datas[i], valor }));
 
       desenharParcelas();
       guardarRascunho();
@@ -597,13 +606,18 @@
       `).join('');
     }
 
+    // Escolheu o dia de uma parcela: as seguintes passam a contar dele.
     linhasParcelasEl.addEventListener('change', (e) => {
       if (!e.target.classList.contains('venc-parcela')) return;
-      parcelas[Number(e.target.dataset.i)].vencimento = e.target.value;
+      const i = Number(e.target.dataset.i);
+      parcelas[i].vencimento = e.target.value;
+      if (i === 0 && e.target.value) primeiraData = e.target.value;
+      TelaPedido.seguirData(parcelas, i, intervaloEscolhido);
+      TelaPedido.mostrarDatas(linhasParcelasEl, parcelas);
       guardarRascunho();
     });
 
-    qtdParcelasEl.addEventListener('input', () => gerarParcelas());
+    qtdParcelasEl.addEventListener('input', () => gerarParcelas({ manterDatas: true }));
 
     document.querySelectorAll('.atalhos-prazo button').forEach(botao => {
       botao.addEventListener('click', () => {
@@ -635,6 +649,7 @@
         avisar('Adicione pelo menos uma peça ao pedido.', 'atencao');
         return null;
       }
+      if (!await TelaPedido.confirmarCores(ultimoCalculo.linhas)) return null;
       const dados = {
         cliente: clienteEl.value.trim(),
         cliente_id: clienteId,
@@ -657,6 +672,7 @@
       clienteEl.value = '';
       qtdParcelasEl.value = 1;
       parcelas = [];
+      primeiraData = null;
       cacheProdutos = null; // estoque mudou, então recarrega na próxima busca
       rascunho.limpar();
       recalcular();
@@ -745,6 +761,7 @@
       formaEl.value = estado.forma || 'prazo';
       qtdParcelasEl.value = estado.qtdParcelas || 1;
       intervaloEscolhido = estado.intervalo || 30;
+      primeiraData = estado.primeiraData || null;
       parcelas = estado.parcelas || [];
       document.querySelectorAll('.atalhos-prazo button').forEach(b => {
         b.classList.toggle('escolhido', Number(b.dataset.intervalo) === intervaloEscolhido);
@@ -784,7 +801,10 @@
           }
           restaurando = true;
           const salvos = pedido.itens.filter(i => i.produto_id);
-          itens = salvos.map(i => ({ produto_id: i.produto_id, nome: i.nome, quantidade: i.quantidade }));
+          itens = salvos.map(i => ({
+            produto_id: i.produto_id, nome: i.nome, quantidade: i.quantidade,
+            ...(i.cor ? { cor: i.cor } : {})
+          }));
           clienteEl.value = pedido.cliente || '';
           clienteId = pedido.cliente_id ?? null;
           formaEl.value = pedido.forma_pagamento === 'balcao' ? 'vista' : pedido.forma_pagamento;
@@ -806,6 +826,7 @@
           if (emAberto.length > 0) {
             qtdParcelasEl.value = emAberto.length;
             parcelas = emAberto.map(p => ({ vencimento: p.vencimento, valor: p.valor }));
+            primeiraData = emAberto[0].vencimento || null;
           }
           const perdidos = pedido.itens.length - itens.length;
           restaurando = false;

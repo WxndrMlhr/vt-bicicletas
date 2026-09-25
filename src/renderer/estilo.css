@@ -420,3 +420,39 @@ tr.selecionada td { border-bottom-color: #D3DFEC; }
 /* O texto ao lado do QR. O min-width: 0 é o que deixa a linha quebrar
    dentro do flex em vez de empurrar o desenho para fora. */
 .pix-ao-lado { flex: 1; min-width: 0; }
+
+/* Cor da linha no pedido, no balcão e no orçamento */
+.linha-cor {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.3rem;
+}
+.linha-cor select.cor {
+  width: auto;
+  min-width: 150px;
+  padding: 0.22rem 0.35rem;
+  font-size: 0.82rem;
+}
+.linha-cor select.cor.sem-cor {
+  border-color: var(--oxido);
+  background: #FFF9F4;
+  color: var(--oxido);
+}
+.linha-cor .outra-cor {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: 0.76rem;
+  color: var(--azul);
+  cursor: pointer;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+
+/* Data de parcela que andou junto quando outra foi mudada */
+input.venc-parcela.seguiu { animation: seguiu 1.2s ease-out; }
+@keyframes seguiu {
+  from { background: #FFE7CC; border-color: var(--sinal); }
+  to   { background: var(--branco); }
+}

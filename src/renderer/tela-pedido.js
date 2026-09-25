@@ -17,8 +17,8 @@
   // atualizadas uma a uma e o campo em uso não é tocado.
   //
   //   vazio       -> HTML da linha "nenhuma peça ainda"
-  //   montarLinha -> (linha) => HTML de um <tr data-linha="ID"> completo
-  //   celulas     -> (linha) => { nomeDaCelula: html } das partes que mudam;
+  //   montarLinha -> (linha, i) => HTML de um <tr data-linha="ID"> completo
+  //   celulas     -> (linha, i) => { nomeDaCelula: html } das partes que mudam;
   //                  cada uma casa com um <td data-c="nomeDaCelula">
   function pintarItens(tbody, linhas, { vazio, montarLinha, celulas }) {
     if (!linhas || linhas.length === 0) {
@@ -35,8 +35,8 @@
     // serve: o navegador devolve "R$&nbsp;38,00" para o "R$ 38,00" que foi
     // escrito, a comparação falhava sempre e a célula era reescrita a cada
     // recálculo — o que engolia o clique num botão dentro dela.
-    function pintarCelulas(tr, linha) {
-      const partes = celulas ? celulas(linha) : {};
+    function pintarCelulas(tr, linha, i) {
+      const partes = celulas ? celulas(linha, i) : {};
       for (const nome of Object.keys(partes)) {
         const celula = tr.querySelector(`[data-c="${nome}"]`);
         if (!celula) continue;
@@ -52,7 +52,7 @@
       tbody.innerHTML = linhas.map(montarLinha).join('');
       // A linha recém-montada já nasce com as células certas; registra isso
       // para o próximo recálculo não reescrever à toa.
-      tbody.querySelectorAll('tr[data-linha]').forEach((tr, i) => pintarCelulas(tr, linhas[i]));
+      tbody.querySelectorAll('tr[data-linha]').forEach((tr, i) => pintarCelulas(tr, linhas[i], i));
       return;
     }
 
@@ -60,7 +60,7 @@
 
     linhas.forEach((linha, i) => {
       const tr = atuais[i];
-      pintarCelulas(tr, linha);
+      pintarCelulas(tr, linha, i);
 
       // Os campos que a pessoa digita (quantidade e, no atacado, o preço) só
       // são corrigidos quando não é neles que ela está — senão o número
@@ -74,7 +74,95 @@
         const texto = precoParaCampo(linha.preco_unitario);
         if (preco.value !== texto) preco.value = texto;
       }
+      const cor = tr.querySelector('select.cor');
+      if (cor) {
+        if (cor !== focado && cor.value !== (linha.cor || '')) cor.value = linha.cor || '';
+        cor.classList.toggle('sem-cor', !linha.cor);
+      }
     });
+  }
+
+  // ---------- Cor da linha ----------
+  //
+  // Peça que existe em várias cores (kit, manopla, aro...) é cadastrada uma
+  // vez só, com a lista de cores em Produtos. No pedido cada linha escolhe a
+  // sua cor, e a mesma peça pode aparecer em várias linhas — cinco kits em
+  // cinco cores são cinco linhas do mesmo kit.
+  //
+  // As linhas são identificadas pela posição (data-i), não pelo produto_id,
+  // justamente porque a mesma peça pode se repetir.
+  const escaparCor = t => String(t ?? '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+
+  // Uma unidade a mais da peça: soma na linha dela que ainda está sem cor
+  // (peça sem cores cadastradas nunca tem cor, então continua somando como
+  // sempre somou). Se todas as linhas dela já têm cor, abre uma linha nova.
+  function adicionarPeca(itens, produto_id, nome) {
+    const existente = itens.find(i => i.produto_id === produto_id && !i.cor);
+    if (existente) existente.quantidade += 1;
+    else itens.push({ produto_id, nome, quantidade: 1 });
+  }
+
+  // Troca a cor da linha i. Se já existe outra linha da mesma peça nessa cor,
+  // as duas viram uma só, somando as quantidades. Devolve a lista nova.
+  function trocarCor(itens, i, cor) {
+    const item = itens[i];
+    if (!item) return itens;
+    const alvo = itens.findIndex((o, n) =>
+      n !== i && o.produto_id === item.produto_id && (o.cor || '') === (cor || ''));
+    if (alvo >= 0) {
+      itens[alvo].quantidade += item.quantidade;
+      return itens.filter((_, n) => n !== i);
+    }
+    if (cor) item.cor = cor;
+    else delete item.cor;
+    return itens;
+  }
+
+  // "+ outra cor": uma linha nova da mesma peça logo abaixo, com uma unidade
+  // e a cor em branco. Preço negociado vai junto — é a mesma peça.
+  function outraCor(itens, i) {
+    const item = itens[i];
+    if (!item) return itens;
+    const nova = { produto_id: item.produto_id, nome: item.nome, quantidade: 1 };
+    if (item.preco !== undefined) nova.preco = item.preco;
+    itens.splice(i + 1, 0, nova);
+    return itens;
+  }
+
+  // O seletor que vai embaixo do nome da peça. Peça sem cores cadastradas não
+  // ganha nada. Cor gravada que saiu da lista continua aparecendo, para o
+  // pedido antigo reabrir do jeito que foi feito.
+  function seletorCor(l, i) {
+    const cores = l.cores || [];
+    if (cores.length === 0 && !l.cor) return '';
+    const opcoes = l.cor && !cores.includes(l.cor) ? [...cores, l.cor] : cores;
+    return `
+      <div class="linha-cor">
+        <select class="cor${l.cor ? '' : ' sem-cor'}" data-i="${i}" title="Cor desta linha">
+          <option value="">Escolha a cor…</option>
+          ${opcoes.map(c => `<option value="${escaparCor(c)}"${c === l.cor ? ' selected' : ''}>${escaparCor(c)}</option>`).join('')}
+        </select>
+        <button type="button" class="outra-cor" data-outra-cor="${i}" title="Mais desta peça, em outra cor">+ outra cor</button>
+      </div>`;
+  }
+
+  // Linhas de peça com cores em que ninguém escolheu a cor.
+  function linhasSemCor(linhas) {
+    return (linhas || []).filter(l => (l.cores || []).length > 0 && !l.cor);
+  }
+
+  // Antes de gravar: linha sem cor passa, mas só com a pessoa sabendo.
+  // Devolve true para seguir, false para voltar e escolher.
+  async function confirmarCores(linhas) {
+    const semCor = linhasSemCor(linhas);
+    if (semCor.length === 0) return true;
+    const quantas = semCor.length === 1 ? 'Uma linha está' : `${semCor.length} linhas estão`;
+    return await window.perguntar(
+      `${quantas} sem a cor escolhida:\n\n` +
+      semCor.map(l => `• ${l.nome}`).join('\n') +
+      '\n\nGravar assim mesmo?',
+      { sim: 'Gravar sem cor', nao: 'Voltar e escolher' }
+    );
   }
 
   // ---------- Campo de preço ----------
@@ -215,5 +303,93 @@
     });
   }
 
-  window.TelaPedido = { pintarItens, criarRascunho, avisarRascunho, ligarSetas, precoParaCampo, precoDoCampo };
+  // ---------- Datas das parcelas ----------
+  //
+  // Mudou a data de uma parcela, as seguintes andam junto, contando a partir
+  // dela no intervalo escolhido. As anteriores ficam como estão.
+  //
+  // "Mensal" é o mesmo dia no mês seguinte (10/10, 10/11, 10/12), e não 30
+  // dias corridos — com 30 dias o vencimento escorregava um dia a cada mês
+  // de 31. Semanal e quinzenal são dias corridos (7 e 15).
+  //
+  // Dia que não existe no mês cai no último dia dele: quem paga todo dia 31
+  // vence em 28/02 (ou 29) e volta para 31/03.
+  const MENSAL = 30;
+
+  // "AAAA-MM-DD" do campo de data, lido como dia local — new Date("2026-10-10")
+  // seria meia-noite em UTC, que no Brasil ainda é o dia 9.
+  function lerData(iso) {
+    const [a, m, d] = String(iso ?? '').split('-').map(Number);
+    return a && m && d ? new Date(a, m - 1, d) : null;
+  }
+
+  function paraISO(d) {
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+
+  // A data `vezes` intervalos depois de `iso`.
+  function somarIntervalo(iso, intervalo, vezes) {
+    const base = lerData(iso);
+    if (!base) return null;
+    if (intervalo === MENSAL) {
+      const alvo = new Date(base.getFullYear(), base.getMonth() + vezes, 1);
+      const ultimoDia = new Date(alvo.getFullYear(), alvo.getMonth() + 1, 0).getDate();
+      alvo.setDate(Math.min(base.getDate(), ultimoDia));
+      return paraISO(alvo);
+    }
+    base.setDate(base.getDate() + intervalo * vezes);
+    return paraISO(base);
+  }
+
+  // Vencimentos de um parcelamento novo. A primeira parcela vence na data que
+  // a pessoa escolheu para ela ou, sem escolha, um intervalo depois de hoje.
+  function datasDasParcelas(quantidade, intervalo, primeira) {
+    const inicio = lerData(primeira) ? primeira : somarIntervalo(paraISO(new Date()), intervalo, 1);
+    return Array.from({ length: quantidade }, (_, i) => somarIntervalo(inicio, intervalo, i));
+  }
+
+  // Mudou a quantidade de parcelas: as datas que já existem ficam, e as
+  // parcelas novas seguem a última data preenchida.
+  function estenderDatas(datas, quantidade, intervalo) {
+    const resultado = datas.slice(0, quantidade);
+    let ultima = -1;
+    resultado.forEach((d, i) => { if (lerData(d)) ultima = i; });
+    for (let j = resultado.length; j < quantidade; j++) {
+      resultado.push(ultima >= 0
+        ? somarIntervalo(resultado[ultima], intervalo, j - ultima)
+        : datasDasParcelas(quantidade, intervalo, null)[j]);
+    }
+    return resultado;
+  }
+
+  // A pessoa escolheu a data da parcela i: as seguintes contam a partir dela.
+  function seguirData(parcelas, i, intervalo) {
+    const base = parcelas[i] && parcelas[i].vencimento;
+    if (!lerData(base)) return;
+    for (let j = i + 1; j < parcelas.length; j++) {
+      parcelas[j].vencimento = somarIntervalo(base, intervalo, j - i);
+    }
+  }
+
+  // Põe as datas novas nos campos sem redesenhar a tabela: o campo em que a
+  // pessoa está digitando não pode sair debaixo do dedo (o "change" da data
+  // dispara no meio da digitação, a cada parte do dia/mês/ano que fecha).
+  // O campo que mudou pisca, para ver o que andou.
+  function mostrarDatas(tabela, parcelas) {
+    tabela.querySelectorAll('input.venc-parcela').forEach(campo => {
+      const valor = (parcelas[Number(campo.dataset.i)] || {}).vencimento || '';
+      if (campo === document.activeElement || campo.value === valor) return;
+      campo.value = valor;
+      campo.classList.remove('seguiu');
+      void campo.offsetWidth; // reinicia a animação
+      campo.classList.add('seguiu');
+    });
+  }
+
+  window.TelaPedido = {
+    pintarItens, criarRascunho, avisarRascunho, ligarSetas, precoParaCampo, precoDoCampo,
+    adicionarPeca, trocarCor, outraCor, seletorCor, linhasSemCor, confirmarCores,
+    datasDasParcelas, estenderDatas, seguirData, mostrarDatas
+  };
 })();

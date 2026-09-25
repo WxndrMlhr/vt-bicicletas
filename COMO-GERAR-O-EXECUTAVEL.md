@@ -26,10 +26,10 @@ Demora alguns minutos na primeira vez (baixa uns 100 MB de componentes do Window
 Vai aparecer uma pasta `instalador` com dois arquivos, com o número da
 versão que está no `package.json` no nome:
 
-- **VT-Bicicletas-Instalador-1.10.0.exe** (~82 MB) — instala o programa no
+- **VT-Bicicletas-Instalador-1.11.0.exe** (~82 MB) — instala o programa no
   computador, cria atalho na área de trabalho e no menu iniciar. É o que você
   quer usar.
-- **VT-Bicicletas-Portatil-1.10.0.exe** (~82 MB) — roda direto, sem instalar.
+- **VT-Bicicletas-Portatil-1.11.0.exe** (~82 MB) — roda direto, sem instalar.
   Serve para levar num pen drive e usar em outro computador.
 
 O `.blockmap` e os `.yml` que aparecem junto são sobra do gerador. Não precisa
@@ -112,7 +112,7 @@ durante o `npm run dist`.
 
 Quando quiser mudar algo no sistema:
 1. Altere os arquivos em `src`
-2. **Aumente a versão no `package.json`** (ex: `1.10.0` para `1.10.1`). Sem isso o
+2. **Aumente a versão no `package.json`** (ex: `1.11.0` para `1.11.1`). Sem isso o
    arquivo sai com o mesmo nome e você não distingue qual é o novo
 3. Rode `npm run dist` de novo
 4. Na loja, feche o ERP e instale por cima

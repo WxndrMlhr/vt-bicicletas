@@ -185,7 +185,7 @@
       document.getElementById('itens').innerHTML = itens.map((i, n) => `
         <tr>
           <td class="ordem">${n + 1}</td>
-          <td class="item">${escapar(i.nome)}</td>
+          <td class="item">${escapar(i.nome)}${i.cor ? ` — <strong>${escapar(i.cor)}</strong>` : ''}</td>
           <td class="num">${i.quantidade}</td>
           <td class="num">${real(i.preco_unitario)}</td>
           <td class="num">${real(i.subtotal)}</td>

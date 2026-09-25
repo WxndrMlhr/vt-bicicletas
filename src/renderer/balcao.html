@@ -339,15 +339,15 @@
         (l.falta > 0 ? `<br><span class="etiqueta critica">Tem ${l.estoque_atual} em estoque</span>` : '');
     }
 
+    // As linhas são pela posição (i): a mesma peça pode estar em várias
+    // linhas, uma por cor.
     function adicionar(produto_id, nome) {
-      const existente = itens.find(i => i.produto_id === produto_id);
-      if (existente) existente.quantidade += 1;
-      else itens.push({ produto_id, nome, quantidade: 1 });
+      TelaPedido.adicionarPeca(itens, produto_id, nome);
       recalcular();
     }
 
-    function remover(produto_id) {
-      itens = itens.filter(i => i.produto_id !== produto_id);
+    function remover(i) {
+      itens = itens.filter((_, n) => n !== i);
       recalcular();
     }
 
@@ -376,7 +376,7 @@
       // pode chegar depois de uma nova e escrever número velho na tela.
       const meuPedido = ++sequenciaCalculo;
       const r = await window.erpAPI.pedidos.calcular(
-        itens.map(({ produto_id, quantidade }) => ({ produto_id, quantidade })),
+        itens.map(({ produto_id, quantidade, cor }) => ({ produto_id, quantidade, cor })),
         'balcao'
       );
       if (meuPedido !== sequenciaCalculo) return;
@@ -384,13 +384,16 @@
 
       TelaPedido.pintarItens(itensEl, r.linhas, {
         vazio: '<tr><td colspan="5" class="vazio">Comece digitando o nome da peça acima.</td></tr>',
-        montarLinha: l => `
+        montarLinha: (l, i) => `
           <tr data-linha="${l.produto_id}">
-            <td data-c="nome">${celulaNome(l)}</td>
-            <td class="num"><input type="number" class="qtd" min="1" value="${l.quantidade}" data-id="${l.produto_id}"></td>
+            <td>
+              <div data-c="nome">${celulaNome(l)}</div>
+              ${TelaPedido.seletorCor(l, i)}
+            </td>
+            <td class="num"><input type="number" class="qtd" min="1" value="${l.quantidade}" data-i="${i}"></td>
             <td class="num" data-c="unitario">${real(l.preco_unitario)}</td>
             <td class="num" data-c="subtotal" style="font-weight:700;">${real(l.subtotal)}</td>
-            <td><button class="perigo mini" data-remover="${l.produto_id}">Tirar</button></td>
+            <td><button class="perigo mini" data-remover="${i}">Tirar</button></td>
           </tr>`,
         celulas: l => ({
           nome: celulaNome(l),
@@ -424,8 +427,8 @@
       }
     }
 
-    function alterarQuantidade(produto_id, quantidade) {
-      const item = itens.find(i => i.produto_id === produto_id);
+    function alterarQuantidade(i, quantidade) {
+      const item = itens[i];
       if (item) { item.quantidade = Math.max(1, quantidade); recalcular(); }
     }
 
@@ -435,7 +438,7 @@
     let tQtd;
     itensEl.addEventListener('input', (e) => {
       if (!e.target.classList.contains('qtd')) return;
-      const id = Number(e.target.dataset.id);
+      const id = Number(e.target.dataset.i);
       const escrito = e.target.value;
       if (escrito === '') return;
       clearTimeout(tQtd);
@@ -448,12 +451,25 @@
       clearTimeout(tQtd);
       const quantidade = Math.max(1, Math.floor(Number(e.target.value) || 1));
       e.target.value = quantidade;
-      alterarQuantidade(Number(e.target.dataset.id), quantidade);
+      alterarQuantidade(Number(e.target.dataset.i), quantidade);
+    });
+
+    // Cor escolhida na linha. Escolher uma cor que outra linha da mesma peça
+    // já tem junta as duas.
+    itensEl.addEventListener('change', (e) => {
+      if (!e.target.classList.contains('cor')) return;
+      itens = TelaPedido.trocarCor(itens, Number(e.target.dataset.i), e.target.value);
+      recalcular();
     });
 
     itensEl.addEventListener('click', (e) => {
       const botao = e.target.closest('button[data-remover]');
       if (botao) remover(Number(botao.dataset.remover));
+      const outra = e.target.closest('button[data-outra-cor]');
+      if (outra) {
+        itens = TelaPedido.outraCor(itens, Number(outra.dataset.outraCor));
+        recalcular();
+      }
     });
 
     // ---------- O QR do pix, com o total dentro ----------
@@ -534,6 +550,8 @@
       finalizando = true;
       travarBotoes(true);
       try {
+        if (!await TelaPedido.confirmarCores(ultimoCalculo.linhas)) return;
+
         // O que a caixinha vai mostrar tem de ser guardado ANTES de limpar
         // o balcão: `limpar` zera o cálculo, e aí não há mais total nenhum.
         const total = ultimoCalculo.total;

@@ -1,4 +1,5 @@
 const db = require('./db');
+const { listaDeCores } = require('./produtos');
 
 // Retorna o preço de um produto para uma forma de pagamento específica.
 // Se o produto não tiver preço de retirada cadastrado, cai para o preço à vista.
@@ -30,8 +31,10 @@ function precoDigitado(preco) {
 }
 
 // Calcula o pedido inteiro.
-// itens = [{ produto_id, quantidade, preco? }]  — preco é o unitário digitado
-// na tela, quando a pessoa trocou o valor da tabela só para este pedido.
+// itens = [{ produto_id, quantidade, preco?, cor? }]  — preco é o unitário
+// digitado na tela, quando a pessoa trocou o valor da tabela só para este
+// pedido; cor é a escolhida na linha, para peça que existe em várias cores.
+// A mesma peça pode aparecer em mais de uma linha, uma por cor.
 //
 // Regra dos R$ 2.000: primeiro calcula o total com a forma de pagamento escolhida.
 // Se esse total atingir R$ 2.000, o pedido é recalculado com o preço de retirada
@@ -40,8 +43,15 @@ function precoDigitado(preco) {
 function calcularPedido(itens, formaPagamento) {
   const buscarProduto = db.prepare('SELECT * FROM produtos WHERE id = ?');
 
+  // O estoque é da peça, não da linha: cinco linhas de uma unidade da mesma
+  // peça, cada uma de uma cor, pedem cinco da prateleira.
+  const pedidoPorPeca = new Map();
+  for (const { produto_id, quantidade } of itens) {
+    pedidoPorPeca.set(produto_id, (pedidoPorPeca.get(produto_id) || 0) + quantidade);
+  }
+
   function montar(forma) {
-    const linhas = itens.map(({ produto_id, quantidade, preco }) => {
+    const linhas = itens.map(({ produto_id, quantidade, preco, cor }) => {
       const produto = buscarProduto.get(produto_id);
       if (!produto) throw new Error(`Produto não encontrado: id ${produto_id}`);
       const preco_tabela = precoPorForma(produto, forma);
@@ -56,9 +66,11 @@ function calcularPedido(itens, formaPagamento) {
         // Para a tela mostrar de onde veio o valor e qual era o da tabela
         preco_tabela,
         preco_manual: manual !== null,
+        cor: (cor && String(cor).trim()) || null,
+        cores: listaDeCores(produto.cores),
         // Informativo: quanto existe em estoque e se dá para atender
         estoque_atual: produto.estoque ?? 0,
-        falta: quantidade - (produto.estoque ?? 0),
+        falta: pedidoPorPeca.get(produto_id) - (produto.estoque ?? 0),
         // Marca quando a peça não tem preço de balcão e caiu para o à vista
         sem_preco_balcao: forma === 'balcao' && produto.preco_balcao == null
       };
@@ -81,7 +93,9 @@ function calcularPedido(itens, formaPagamento) {
     }
   }
 
-  const semEstoque = resultado.linhas.filter(l => l.falta > 0);
+  // Uma entrada por peça, mesmo que ela esteja em várias linhas (cores).
+  const semEstoque = resultado.linhas.filter((l, i, todas) =>
+    l.falta > 0 && todas.findIndex(o => o.produto_id === l.produto_id) === i);
   const semPrecoBalcao = resultado.linhas.filter(l => l.sem_preco_balcao);
 
   return {
@@ -90,7 +104,7 @@ function calcularPedido(itens, formaPagamento) {
     descontoAcimaDe2k,
     semEstoque: semEstoque.map(l => ({
       nome: l.nome,
-      pedido: l.quantidade,
+      pedido: pedidoPorPeca.get(l.produto_id),
       tem: l.estoque_atual,
       falta: l.falta
     })),
@@ -109,8 +123,8 @@ function salvarPedido({ cliente, cliente_id, formaPagamento, linhas, total, venc
      VALUES (?, ?, ?, ?, ?)`
   );
   const inserirItem = db.prepare(`
-    INSERT INTO pedido_itens (pedido_id, produto_id, nome, quantidade, preco_unitario, subtotal)
-    VALUES (@pedido_id, @produto_id, @nome, @quantidade, @preco_unitario, @subtotal)
+    INSERT INTO pedido_itens (pedido_id, produto_id, nome, cor, quantidade, preco_unitario, subtotal)
+    VALUES (@pedido_id, @produto_id, @nome, @cor, @quantidade, @preco_unitario, @subtotal)
   `);
 
   const transacao = db.transaction(() => {
@@ -124,6 +138,7 @@ function salvarPedido({ cliente, cliente_id, formaPagamento, linhas, total, venc
         pedido_id,
         produto_id: linha.produto_id,
         nome: linha.nome,
+        cor: linha.cor || null,
         quantidade: linha.quantidade,
         preco_unitario: linha.preco_unitario,
         subtotal: linha.subtotal
@@ -172,8 +187,8 @@ function atualizarPedido(id, { cliente, cliente_id, formaPagamento, linhas, tota
   const financeiro = require('./financeiro');
 
   const inserirItem = db.prepare(`
-    INSERT INTO pedido_itens (pedido_id, produto_id, nome, quantidade, preco_unitario, subtotal)
-    VALUES (@pedido_id, @produto_id, @nome, @quantidade, @preco_unitario, @subtotal)
+    INSERT INTO pedido_itens (pedido_id, produto_id, nome, cor, quantidade, preco_unitario, subtotal)
+    VALUES (@pedido_id, @produto_id, @nome, @cor, @quantidade, @preco_unitario, @subtotal)
   `);
 
   const transacao = db.transaction(() => {
@@ -202,6 +217,7 @@ function atualizarPedido(id, { cliente, cliente_id, formaPagamento, linhas, tota
         pedido_id: id,
         produto_id: linha.produto_id,
         nome: linha.nome,
+        cor: linha.cor || null,
         quantidade: linha.quantidade,
         preco_unitario: linha.preco_unitario,
         subtotal: linha.subtotal

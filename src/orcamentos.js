@@ -38,8 +38,8 @@ function situacaoEfetiva(orcamento) {
 }
 
 const inserirItem = () => db.prepare(`
-  INSERT INTO orcamento_itens (orcamento_id, produto_id, nome, quantidade, preco_unitario, subtotal)
-  VALUES (@orcamento_id, @produto_id, @nome, @quantidade, @preco_unitario, @subtotal)
+  INSERT INTO orcamento_itens (orcamento_id, produto_id, nome, cor, quantidade, preco_unitario, subtotal)
+  VALUES (@orcamento_id, @produto_id, @nome, @cor, @quantidade, @preco_unitario, @subtotal)
 `);
 
 // A linha vinda da tela carrega dados extras (estoque, falta) só para o aviso.
@@ -51,6 +51,7 @@ function gravarItens(orcamento_id, linhas) {
       orcamento_id,
       produto_id: linha.produto_id ?? null,
       nome: linha.nome,
+      cor: linha.cor || null,
       quantidade: linha.quantidade,
       preco_unitario: linha.preco_unitario,
       subtotal: linha.subtotal
@@ -217,6 +218,7 @@ function converterEmPedido(id, { parcelas, meioPagamento } = {}) {
     linhas: orcamento.itens.map(i => ({
       produto_id: i.produto_id,
       nome: i.nome,
+      cor: i.cor,
       quantidade: i.quantidade,
       preco_unitario: i.preco_unitario,
       subtotal: i.subtotal

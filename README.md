@@ -71,6 +71,21 @@ Produtos — é o preço combinado para aquela venda, e é ele que vai para o cu
 o PDF e o histórico. Ao reabrir o pedido para edição, a linha cujo preço salvo
 não bate com a tabela continua com o valor negociado.
 
+**Peça com cores é cadastrada uma vez só.** Em Produtos, o campo "Cores" recebe
+a lista separada por vírgula (ex: `azul, preto, rosa`). No balcão, no pedido
+atacado e no orçamento, a linha dessa peça ganha uma caixinha para escolher a
+cor e um "+ outra cor", que abre outra linha da mesma peça: cinco kits em cinco
+cores são cinco linhas do mesmo kit. Escolher uma cor que outra linha da mesma
+peça já tem junta as duas. A cor sai no cupom, no PDF e no histórico; gravar
+com linha sem cor pede confirmação. O aviso de estoque soma todas as linhas da
+peça.
+
+**Mudar a data de uma parcela leva as seguintes junto.** As parcelas seguintes
+passam a contar da data escolhida, no intervalo marcado; as anteriores ficam.
+"Mensal" é o mesmo dia no mês seguinte (dia que não existe cai no último do
+mês); semanal e quinzenal são 7 e 15 dias corridos. Aumentar o número de
+parcelas mantém as datas que já estão na tela.
+
 **Pedido salvo pode ser editado.** Em Pedidos, o botão "Editar pedido" reabre a
 venda na tela de atacado. Gravar substitui o pedido no mesmo número: as peças da
 versão anterior voltam ao estoque, as novas são baixadas e as cobranças em

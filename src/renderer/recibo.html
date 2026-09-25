@@ -220,7 +220,7 @@
 
       document.getElementById('itens').innerHTML = pedido.itens.map(i => `
         <tr>
-          <td colspan="2" class="item-nome">${i.nome}</td>
+          <td colspan="2" class="item-nome">${i.nome}${i.cor ? ` - ${i.cor.toUpperCase()}` : ''}</td>
         </tr>
         <tr>
           <td class="detalhe">${i.quantidade} x ${formatarReal(i.preco_unitario)}</td>

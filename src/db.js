@@ -279,6 +279,11 @@ garantirColuna('pedidos', 'motivo_cancelamento', 'TEXT');
 garantirColuna('pedidos', 'meio_pagamento', 'TEXT');
 garantirColuna('contas_receber', 'parcela', 'INTEGER');
 garantirColuna('contas_receber', 'total_parcelas', 'INTEGER');
+// Cores em que a peça existe ("azul, preto, rosa") e a cor escolhida em cada
+// linha do pedido/orçamento. Uma peça só serve para todas as cores.
+garantirColuna('produtos', 'cores', 'TEXT');
+garantirColuna('pedido_itens', 'cor', 'TEXT');
+garantirColuna('orcamento_itens', 'cor', 'TEXT');
 
 // Tabela de preços que vem junto com o programa.
 // Roda uma vez só: banco que já tem produtos não é tocado, e banco novo

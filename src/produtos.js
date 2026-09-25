@@ -1,5 +1,26 @@
 const db = require('./db');
 
+// Cores da peça, do jeito que se digita: "azul, preto; rosa".
+// Devolve a lista limpa, sem repetir (maiúscula ou não).
+function listaDeCores(texto) {
+  const vistas = new Set();
+  return String(texto ?? '')
+    .split(/[,;\n]/)
+    .map(c => c.trim().replace(/\s+/g, ' '))
+    .filter(c => {
+      const chave = db.semAcento(c);
+      if (!c || vistas.has(chave)) return false;
+      vistas.add(chave);
+      return true;
+    });
+}
+
+// Como fica gravado no banco: "azul, preto, rosa" — ou nada.
+function coresParaGravar(texto) {
+  const lista = listaDeCores(texto);
+  return lista.length ? lista.join(', ') : null;
+}
+
 function buscarProdutos(termo) {
   // Sem acento dos dois lados: quem digita "camara" tem de achar "Câmara".
   const like = `%${db.semAcento(termo)}%`;
@@ -14,19 +35,20 @@ function listarProdutos() {
   return db.prepare('SELECT * FROM produtos ORDER BY nome').all();
 }
 
-function adicionarProduto({ nome, categoria, preco_prazo, preco_vista, preco_vista_retirada, preco_balcao }) {
+function adicionarProduto({ nome, categoria, preco_prazo, preco_vista, preco_vista_retirada, preco_balcao, cores }) {
   const stmt = db.prepare(`
-    INSERT INTO produtos (nome, categoria, preco_prazo, preco_vista, preco_vista_retirada, preco_balcao)
-    VALUES (@nome, @categoria, @preco_prazo, @preco_vista, @preco_vista_retirada, @preco_balcao)
+    INSERT INTO produtos (nome, categoria, preco_prazo, preco_vista, preco_vista_retirada, preco_balcao, cores)
+    VALUES (@nome, @categoria, @preco_prazo, @preco_vista, @preco_vista_retirada, @preco_balcao, @cores)
   `);
   const info = stmt.run({
     nome, categoria, preco_prazo, preco_vista,
-    preco_vista_retirada, preco_balcao: preco_balcao ?? null
+    preco_vista_retirada, preco_balcao: preco_balcao ?? null,
+    cores: coresParaGravar(cores)
   });
   return info.lastInsertRowid;
 }
 
-function atualizarProduto(id, { nome, categoria, preco_prazo, preco_vista, preco_vista_retirada, preco_balcao }) {
+function atualizarProduto(id, { nome, categoria, preco_prazo, preco_vista, preco_vista_retirada, preco_balcao, cores }) {
   const anterior = db.prepare('SELECT * FROM produtos WHERE id = ?').get(id);
   if (!anterior) throw new Error('Peça não encontrada.');
 
@@ -49,11 +71,14 @@ function atualizarProduto(id, { nome, categoria, preco_prazo, preco_vista, preco
         preco_prazo = @preco_prazo,
         preco_vista = @preco_vista,
         preco_vista_retirada = @preco_vista_retirada,
-        preco_balcao = @preco_balcao
+        preco_balcao = @preco_balcao,
+        cores = @cores
     WHERE id = @id
   `).run({
     id, nome, categoria, preco_prazo, preco_vista,
-    preco_vista_retirada, preco_balcao: balcaoNovo
+    preco_vista_retirada, preco_balcao: balcaoNovo,
+    // Quem não mandou cores não está mexendo nelas: ficam como estavam.
+    cores: cores === undefined ? anterior.cores : coresParaGravar(cores)
   });
 }
 
@@ -202,5 +227,6 @@ module.exports = {
   listarAlteracoes,
   desfazerAlteracao,
   listarCategorias,
-  calcularPreco
+  calcularPreco,
+  listaDeCores
 };
