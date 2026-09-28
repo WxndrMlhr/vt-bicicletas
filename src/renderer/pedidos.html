@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Novo pedido — VT Bicicletas</title>
   <link rel="stylesheet" href="estilo.css">
+  <script src="dados-cliente.js"></script>
   <script src="tela-pedido.js"></script>
   <style>
     /* Bloco do total: a peça de destaque da tela */
@@ -135,6 +136,9 @@
           </div>
         </div>
       </div>
+
+      <!-- Endereço, CEP, documento e telefone: só aparecem na venda a prazo -->
+      <div id="dados-cliente" style="display:none;"></div>
 
       <div class="campo-busca">
         <label class="campo" for="busca">Adicionar peça ao pedido</label>
@@ -278,8 +282,20 @@
 
     TelaPedido.ligarSetas(buscaEl, sugProdEl, escolherProduto);
 
+    // ---------- Dados do cliente ----------
+    // Endereço, CEP, documento e telefone. Aparecem só na venda a prazo, e
+    // nenhum é obrigatório: o que ficar em branco não sai no pedido.
+    const lugarDadosCliente = document.getElementById('dados-cliente');
+    const blocoCliente = (() => {
+      const lugar = document.getElementById('dados-cliente');
+      lugar.innerHTML = TelaPedido.camposCliente('pc');
+      return lugar.firstElementChild;
+    })();
+    TelaPedido.ligarCamposCliente(blocoCliente, () => guardarRascunho());
+
     // ---------- Busca de cliente ----------
     let tCliente;
+    let clientesAchados = new Map();   // id -> cliente, da última busca
     clienteEl.addEventListener('input', (e) => {
       clearTimeout(tCliente);
       clienteId = null; // digitou à mão, então deixa de ser um cliente vinculado
@@ -288,20 +304,27 @@
       if (termo.length < 2) { sugCliEl.style.display = 'none'; return; }
       tCliente = setTimeout(async () => {
         const achados = await window.erpAPI.clientes.buscar(termo);
+        clientesAchados = new Map(achados.map(c => [c.id, c]));
         if (achados.length === 0) { sugCliEl.style.display = 'none'; return; }
-        sugCliEl.innerHTML = achados.map(c => `
+        sugCliEl.innerHTML = achados.map(c => {
+          const apoio = [c.telefone, c.documento].filter(Boolean).map(escapar).join(' · ');
+          return `
           <div class="sugestao" data-id="${c.id}" data-nome="${escapar(c.nome)}">
             ${escapar(c.nome)}
-            ${c.telefone ? `<span class="apoio"> ${escapar(c.telefone)}</span>` : ''}
-          </div>`).join('');
+            ${apoio ? `<span class="apoio"> ${apoio}</span>` : ''}
+          </div>`;
+        }).join('');
         sugCliEl.style.display = 'block';
       }, 180);
     });
 
+    // Escolheu da lista: o endereço, o CEP e o documento vêm da ficha dele.
     function escolherCliente(opcao) {
       clienteId = Number(opcao.dataset.id);
       clienteEl.value = opcao.dataset.nome;
       sugCliEl.style.display = 'none';
+      const ficha = clientesAchados.get(clienteId);
+      if (ficha) TelaPedido.preencherCamposCliente(blocoCliente, ficha);
       guardarRascunho();
     }
 
@@ -367,6 +390,7 @@
         itens,
         cliente: clienteEl.value,
         clienteId,
+        dadosCliente: TelaPedido.lerCamposCliente(blocoCliente),
         forma: formaEl.value,
         qtdParcelas: qtdParcelasEl.value,
         intervalo: intervaloEscolhido,
@@ -635,6 +659,8 @@
       document.querySelectorAll('.atalhos-prazo button').forEach(b => { b.disabled = !aPrazo; });
       if (aPrazo) gerarParcelas({ manterDatas: true });
       else painelParcelasEl.style.display = 'none';
+      // Endereço, CEP e documento: só na venda a prazo.
+      lugarDadosCliente.style.display = aPrazo ? '' : 'none';
     }
 
     formaEl.addEventListener('change', () => {
@@ -649,27 +675,50 @@
         avisar('Adicione pelo menos uma peça ao pedido.', 'atencao');
         return null;
       }
+
+      // Venda a prazo leva os dados do cliente que foram preenchidos; o que
+      // foi preenchido errado (CPF que não confere, CEP pela metade) segura.
+      const aPrazo = formaEl.value === 'prazo';
+      const dadosCliente = aPrazo ? TelaPedido.lerCamposCliente(blocoCliente) : null;
+      if (aPrazo) {
+        const problemas = DadosCliente.problemas(dadosCliente);
+        if (problemas.length > 0) {
+          avisar(DadosCliente.mensagemProblemas(problemas), 'atencao');
+          TelaPedido.marcarProblemas(blocoCliente, problemas, { focar: true });
+          return null;
+        }
+      }
+
       if (!await TelaPedido.confirmarCores(ultimoCalculo.linhas)) return null;
       const dados = {
         cliente: clienteEl.value.trim(),
         cliente_id: clienteId,
+        dadosCliente,
         formaPagamento: ultimoCalculo.formaPagamento,
         linhas: ultimoCalculo.linhas,
         total: ultimoCalculo.total,
         parcelas: formaEl.value === 'prazo' ? parcelas : null
       };
 
-      if (!pedidoEditando) return await window.erpAPI.pedidos.salvar(dados);
+      // O sistema confere de novo antes de gravar; se recusar, a pessoa
+      // precisa ler o porquê, e o pedido continua na tela.
+      try {
+        if (!pedidoEditando) return await window.erpAPI.pedidos.salvar(dados);
 
-      const r = await window.erpAPI.pedidos.atualizar(pedidoEditando, dados);
-      if (r && r.avisoConta) avisar(r.avisoConta, 'atencao');
-      return pedidoEditando;
+        const r = await window.erpAPI.pedidos.atualizar(pedidoEditando, dados);
+        if (r && r.avisoConta) avisar(r.avisoConta, 'atencao');
+        return pedidoEditando;
+      } catch (erro) {
+        avisar(`Não deu para salvar o pedido: ${motivo(erro)}`, 'erro');
+        return null;
+      }
     }
 
     function limparTudo() {
       itens = [];
       clienteId = null;
       clienteEl.value = '';
+      TelaPedido.preencherCamposCliente(blocoCliente, {});
       qtdParcelasEl.value = 1;
       parcelas = [];
       primeiraData = null;
@@ -758,6 +807,7 @@
       itens = estado.itens || [];
       clienteEl.value = estado.cliente || '';
       clienteId = estado.clienteId ?? null;
+      TelaPedido.preencherCamposCliente(blocoCliente, estado.dadosCliente || {});
       formaEl.value = estado.forma || 'prazo';
       qtdParcelasEl.value = estado.qtdParcelas || 1;
       intervaloEscolhido = estado.intervalo || 30;
@@ -807,6 +857,7 @@
           }));
           clienteEl.value = pedido.cliente || '';
           clienteId = pedido.cliente_id ?? null;
+          TelaPedido.preencherCamposCliente(blocoCliente, pedido);
           formaEl.value = pedido.forma_pagamento === 'balcao' ? 'vista' : pedido.forma_pagamento;
 
           // Linha cujo preço salvo não bate com o da tabela foi negociada na

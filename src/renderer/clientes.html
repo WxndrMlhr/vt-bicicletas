@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <title>Clientes — VT Bicicletas</title>
   <link rel="stylesheet" href="estilo.css">
+  <script src="dados-cliente.js"></script>
+  <script src="tela-pedido.js"></script>
 </head>
 <body>
   <script src="menu.js"></script>
@@ -18,7 +20,7 @@
           <div class="filtros" style="margin-bottom: 0.9rem;">
             <div style="flex: 1;">
               <label class="campo" for="filtro">Procurar</label>
-              <input type="text" id="filtro" placeholder="Nome ou telefone">
+              <input type="text" id="filtro" placeholder="Nome, telefone ou CPF/CNPJ">
             </div>
             <button class="escuro" id="btn-novo">Novo cliente</button>
           </div>
@@ -71,7 +73,7 @@
 
       if (clientes.length === 0) {
         listaEl.innerHTML = `<tr><td colspan="4" class="vazio">${
-          termo ? 'Nenhum cliente com esse nome ou telefone.' : 'Nenhum cliente cadastrado. Comece pelo botão “Novo cliente”.'
+          termo ? 'Nenhum cliente com esse nome, telefone ou documento.' : 'Nenhum cliente cadastrado. Comece pelo botão “Novo cliente”.'
         }</td></tr>`;
         return;
       }
@@ -100,8 +102,9 @@
       fichaEl.innerHTML = `
         <h2 class="secao">Ficha do cliente</h2>
         <div style="font-family: var(--face-titulo); font-size: 1.25rem; margin-bottom: 0.15rem;">${escapar(c.nome)}</div>
-        <div style="color: var(--aco-500); font-size: 0.85rem; margin-bottom: 1rem;">
-          ${escapar(c.telefone) || 'Sem telefone'}${c.endereco ? ' · ' + escapar(c.endereco) : ''}
+        <div style="color: var(--aco-500); font-size: 0.85rem; margin-bottom: 1rem; line-height: 1.5;">
+          ${escapar(c.telefone) || 'Sem telefone'}${c.endereco ? ' · ' + escapar(c.endereco) : ''}${c.cep ? ' · CEP ' + escapar(c.cep) : ''}
+          ${c.documento ? '<br>' + escapar(DadosCliente.textoDocumento(c.documento_tipo, c.documento)) : ''}
         </div>
 
         <div class="grade-3" style="margin-bottom: 1rem;">
@@ -169,16 +172,7 @@
             <input type="text" id="f-nome" value="${escapar(cliente?.nome)}" placeholder="Nome do cliente">
           </div>
         </div>
-        <div class="linha-campos c2">
-          <div>
-            <label class="campo" for="f-telefone">Telefone</label>
-            <input type="text" id="f-telefone" value="${escapar(cliente?.telefone)}" placeholder="(21) 90000-0000">
-          </div>
-          <div>
-            <label class="campo" for="f-endereco">Endereço</label>
-            <input type="text" id="f-endereco" value="${escapar(cliente?.endereco)}" placeholder="Rua, número, bairro">
-          </div>
-        </div>
+        ${TelaPedido.camposCliente('f')}
         <div class="linha-campos">
           <div>
             <label class="campo" for="f-obs">Observações</label>
@@ -191,6 +185,13 @@
         </div>
       `;
 
+      // Endereço, CEP e documento não são obrigatórios, mas documento ou CEP
+      // digitado errado não entra.
+      const blocoCliente = fichaEl.querySelector('.dados-cliente');
+      blocoCliente.classList.add('estreito');
+      TelaPedido.preencherCamposCliente(blocoCliente, cliente || {});
+      TelaPedido.ligarCamposCliente(blocoCliente);
+
       document.getElementById('f-cancelar').addEventListener('click', async () => {
         if (editando) mostrarFicha(await window.erpAPI.clientes.ficha(cliente.id));
         else fichaEl.innerHTML = '<p class="vazio">Escolha um cliente para ver a ficha, ou cadastre um novo.</p>';
@@ -199,12 +200,17 @@
       document.getElementById('f-salvar').addEventListener('click', async () => {
         const dados = {
           nome: document.getElementById('f-nome').value.trim(),
-          telefone: document.getElementById('f-telefone').value.trim(),
-          endereco: document.getElementById('f-endereco').value.trim(),
+          ...TelaPedido.lerCamposCliente(blocoCliente),
           observacoes: document.getElementById('f-obs').value.trim()
         };
         if (!dados.nome) {
           avisar('O cliente precisa de um nome.', 'atencao');
+          return;
+        }
+        const problemas = DadosCliente.problemas(dados);
+        if (problemas.length > 0) {
+          avisar(DadosCliente.mensagemProblemas(problemas), 'atencao');
+          TelaPedido.marcarProblemas(blocoCliente, problemas, { focar: true });
           return;
         }
         if (editando) {

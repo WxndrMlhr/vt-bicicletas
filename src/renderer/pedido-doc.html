@@ -159,9 +159,13 @@
         '#' + String(pedido.id ?? 0).padStart(4, '0');
       document.getElementById('datas').textContent = dataHora(pedido.criado_em);
 
-      const contato = [pedido.telefone, pedido.endereco].filter(Boolean);
+      // Venda a prazo sai com endereço, CEP e documento: é o que identifica
+      // quem ficou devendo.
+      const endereco = [pedido.endereco, pedido.cep ? `CEP ${pedido.cep}` : ''].filter(Boolean);
+      const contato = [pedido.documento_texto, pedido.telefone].filter(Boolean);
       document.getElementById('cliente').innerHTML = pedido.cliente
         ? `<div class="nome">${escapar(pedido.cliente)}</div>
+           ${endereco.length ? `<div class="linha">${endereco.map(escapar).join(' · ')}</div>` : ''}
            ${contato.length ? `<div class="linha">${contato.map(escapar).join(' · ')}</div>` : ''}`
         : '<div class="nome vazio">Consumidor</div>';
 

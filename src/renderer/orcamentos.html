@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Orçamentos — VT Bicicletas</title>
   <link rel="stylesheet" href="estilo.css">
+  <script src="dados-cliente.js"></script>
   <script src="tela-pedido.js"></script>
   <style>
     /* Bloco do total: a peça de destaque da tela */
@@ -840,6 +841,8 @@
           </div>
 
           ${orcamento.forma_pagamento === 'prazo' ? `
+            <label class="campo">Dados de ${escapar(orcamento.cliente) || 'cliente'} (o que ficar em branco não sai no pedido)</label>
+            <div id="aprovar-dados-cliente"></div>
             <div class="linha-campos c2">
               <div>
                 <label class="campo" for="qtd-parcelas">Parcelas</label>
@@ -1017,6 +1020,16 @@
           </tr>`).join('');
       }
 
+      // Venda a prazo leva endereço, CEP e documento, se tiver. Vêm
+      // preenchidos da ficha, quando o orçamento é de um cliente cadastrado.
+      let blocoCliente = null;
+      if (aPrazo && areaAprovar) {
+        em('aprovar-dados-cliente').innerHTML = TelaPedido.camposCliente('ac');
+        blocoCliente = em('aprovar-dados-cliente').firstElementChild;
+        TelaPedido.ligarCamposCliente(blocoCliente);
+        TelaPedido.preencherCamposCliente(blocoCliente, orcamento);
+      }
+
       if (aPrazo && areaAprovar) {
         em('qtd-parcelas').addEventListener('input', () => gerarParcelas({ manterDatas: true }));
         // Escolheu o dia de uma parcela: as seguintes passam a contar dele.
@@ -1056,11 +1069,21 @@
 
       quando('btn-aprovar-sim', 'click', async (ev) => {
         const botao = ev.target;
+        const dadosCliente = blocoCliente ? TelaPedido.lerCamposCliente(blocoCliente) : null;
+        if (aPrazo) {
+          const problemas = DadosCliente.problemas(dadosCliente);
+          if (problemas.length > 0) {
+            avisar(DadosCliente.mensagemProblemas(problemas), 'atencao');
+            TelaPedido.marcarProblemas(blocoCliente, problemas, { focar: true });
+            return;
+          }
+        }
         botao.disabled = true;
         try {
           const r = await window.erpAPI.orcamentos.converterEmPedido(orcamento.id, {
             parcelas: aPrazo ? parcelas : null,
-            meioPagamento: aPrazo ? null : meioPagamento
+            meioPagamento: aPrazo ? null : meioPagamento,
+            dadosCliente
           });
           await carregarLista();
           await selecionar(orcamento.id);

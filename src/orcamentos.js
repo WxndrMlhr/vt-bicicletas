@@ -157,12 +157,16 @@ function buscarOrcamento(id) {
   // Endereço e telefone vêm da ficha do cliente quando ele é cadastrado —
   // assim o documento sai completo sem redigitar nada.
   if (orcamento.cliente_id) {
-    const c = db.prepare('SELECT nome, telefone, endereco FROM clientes WHERE id = ?')
-      .get(orcamento.cliente_id);
+    const c = db.prepare(`
+      SELECT nome, telefone, endereco, cep, documento_tipo, documento FROM clientes WHERE id = ?
+    `).get(orcamento.cliente_id);
     if (c) {
       orcamento.cliente = orcamento.cliente || c.nome;
       orcamento.telefone = orcamento.telefone || c.telefone;
       orcamento.endereco = c.endereco;
+      orcamento.cep = c.cep;
+      orcamento.documento_tipo = c.documento_tipo;
+      orcamento.documento = c.documento;
     }
   }
 
@@ -201,7 +205,9 @@ function prorrogar(id, novaValidade) {
 // mudado depois — foi esse valor que a loja prometeu.
 // A partir daqui valem as regras normais do pedido: baixa de estoque e,
 // se for a prazo, as contas a receber.
-function converterEmPedido(id, { parcelas, meioPagamento } = {}) {
+// dadosCliente = { telefone, endereco, cep, documento_tipo, documento } — os
+// dados da venda a prazo, todos opcionais (ver pedidos.prepararCliente).
+function converterEmPedido(id, { parcelas, meioPagamento, dadosCliente } = {}) {
   const orcamento = buscarOrcamento(id);
   if (!orcamento) throw new Error(`Orçamento #${id} não encontrado.`);
   if (orcamento.pedido_id) {
@@ -214,6 +220,7 @@ function converterEmPedido(id, { parcelas, meioPagamento } = {}) {
   const pedido_id = pedidos.salvarPedido({
     cliente: orcamento.cliente,
     cliente_id: orcamento.cliente_id,
+    dadosCliente: { telefone: orcamento.telefone, ...(dadosCliente || {}) },
     formaPagamento: orcamento.forma_pagamento,
     linhas: orcamento.itens.map(i => ({
       produto_id: i.produto_id,

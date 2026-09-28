@@ -103,6 +103,17 @@ entrega grátis.
 **Pedido a prazo gera cobrança.** Ao salvar, o sistema cria automaticamente uma
 conta a receber com o vencimento informado.
 
+**Dados do cliente na venda a prazo.** Com a forma "A prazo", logo abaixo do
+nome aparecem endereço, CEP, documento (CPF, CNPJ ou RG) e telefone; nas outras
+formas eles não aparecem. Nenhum é obrigatório: o que ficar em branco não sai no
+pedido nem no cupom. O que for preenchido errado não passa — CPF e CNPJ têm os
+dígitos conferidos (inclusive o CNPJ novo, com letras) e o CEP precisa dos 8
+números. Escolher um cliente da lista preenche tudo com a ficha dele, e o que for
+digitado no pedido atualiza a ficha (campo em branco não apaga a ficha). O
+pedido guarda uma cópia desses dados: mudar o endereço do cliente depois não
+muda o papel de uma venda antiga. A aprovação de orçamento a prazo tem os mesmos
+campos, e a busca de clientes acha pelo CPF/CNPJ, com ou sem pontos.
+
 **Venda dá baixa no estoque.** Salvar o pedido desconta as peças. Se o estoque
 não cobrir a quantidade, o sistema avisa mas não impede a venda — a contagem
 pode estar atrasada em relação à prateleira.

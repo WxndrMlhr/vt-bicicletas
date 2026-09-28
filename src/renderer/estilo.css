@@ -456,3 +456,45 @@ input.venc-parcela.seguiu { animation: seguiu 1.2s ease-out; }
   from { background: #FFE7CC; border-color: var(--sinal); }
   to   { background: var(--branco); }
 }
+
+/* Dados do cliente na venda a prazo: endereço, CEP, documento e telefone
+   (tela-pedido.js) */
+.dados-cliente {
+  display: grid;
+  grid-template-columns: 2.2fr 0.9fr 1.7fr 1.1fr;
+  gap: 0.8rem;
+  margin-bottom: 0.9rem;
+}
+.dados-cliente .doc-junto { display: flex; gap: 0.35rem; }
+.dados-cliente .doc-junto select { width: 78px; flex: none; }
+.dados-cliente input.invalido {
+  border-color: var(--oxido);
+  background: #FFF9F4;
+}
+.dados-cliente .dc-aviso {
+  grid-column: 1 / -1;
+  font-size: 0.8rem;
+  color: var(--oxido);
+  margin-top: -0.4rem;
+}
+.dados-cliente .dc-aviso:empty { display: none; }
+/* Em painel estreito (aprovação do orçamento, ficha do cliente) e em tela
+   pequena: duas colunas. Endereço e documento na linha inteira, CEP e
+   telefone lado a lado entre eles. */
+.caixa-acao .dados-cliente,
+.dados-cliente.estreito { grid-template-columns: 1fr 1fr; }
+.caixa-acao .dados-cliente .dc-endereco,
+.dados-cliente.estreito .dc-endereco,
+.caixa-acao .dados-cliente .dc-documento,
+.dados-cliente.estreito .dc-documento { grid-column: 1 / -1; }
+.caixa-acao .dados-cliente .dc-documento,
+.dados-cliente.estreito .dc-documento { order: 2; }
+.caixa-acao .dados-cliente .dc-aviso,
+.dados-cliente.estreito .dc-aviso { order: 3; }
+@media (max-width: 1100px) {
+  .dados-cliente { grid-template-columns: 1fr 1fr; }
+  .dados-cliente .dc-endereco,
+  .dados-cliente .dc-documento { grid-column: 1 / -1; }
+  .dados-cliente .dc-documento { order: 2; }
+  .dados-cliente .dc-aviso { order: 3; }
+}

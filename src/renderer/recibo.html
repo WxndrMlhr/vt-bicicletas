@@ -194,10 +194,18 @@
         hour: '2-digit', minute: '2-digit'
       });
 
+      // Dados do cliente só na venda a prazo, e só o que foi preenchido.
+      // São digitados à mão: escapados, para um "<" não virar HTML no cupom.
+      const aPrazo = pedido.forma_pagamento === 'prazo';
+      const esc = t => String(t ?? '').replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
       document.getElementById('cabecalho').innerHTML = `
         <div><span class="negrito">Pedido:</span> #${pedido.id ?? '-'}</div>
         <div><span class="negrito">Data:</span> ${dataTexto}</div>
         ${pedido.cliente ? `<div><span class="negrito">Cliente:</span> ${pedido.cliente}</div>` : ''}
+        ${aPrazo && pedido.documento_texto ? `<div><span class="negrito">Doc.:</span> ${esc(pedido.documento_texto)}</div>` : ''}
+        ${aPrazo && pedido.endereco ? `<div><span class="negrito">End.:</span> ${esc(pedido.endereco)}</div>` : ''}
+        ${aPrazo && pedido.cep ? `<div><span class="negrito">CEP:</span> ${esc(pedido.cep)}</div>` : ''}
+        ${aPrazo && pedido.telefone ? `<div><span class="negrito">Tel.:</span> ${esc(pedido.telefone)}</div>` : ''}
         <div><span class="negrito">Pagamento:</span> ${nomesForma[pedido.forma_pagamento] || pedido.forma_pagamento}</div>
       `;
 

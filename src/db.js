@@ -284,6 +284,23 @@ garantirColuna('contas_receber', 'total_parcelas', 'INTEGER');
 garantirColuna('produtos', 'cores', 'TEXT');
 garantirColuna('pedido_itens', 'cor', 'TEXT');
 garantirColuna('orcamento_itens', 'cor', 'TEXT');
+// Venda a prazo pode levar endereço, CEP e documento (CPF, CNPJ ou RG). Ficam
+// na ficha do cliente, para preencher sozinho da próxima vez, e também no
+// pedido: o papel de uma venda antiga tem de mostrar o endereço de quando ela
+// foi feita, mesmo que o cliente tenha se mudado depois.
+//
+// cliente_dados_gravados = 1 marca o pedido a prazo que já nasceu com esses
+// campos: nele vale só o que foi digitado (campo deixado em branco não sai no
+// papel). Pedido de antes disso continua buscando telefone e endereço na ficha.
+garantirColuna('clientes', 'cep', 'TEXT');
+garantirColuna('clientes', 'documento_tipo', 'TEXT');   // 'cpf' | 'cnpj' | 'rg'
+garantirColuna('clientes', 'documento', 'TEXT');
+garantirColuna('pedidos', 'cliente_telefone', 'TEXT');
+garantirColuna('pedidos', 'cliente_endereco', 'TEXT');
+garantirColuna('pedidos', 'cliente_cep', 'TEXT');
+garantirColuna('pedidos', 'cliente_documento_tipo', 'TEXT');
+garantirColuna('pedidos', 'cliente_documento', 'TEXT');
+garantirColuna('pedidos', 'cliente_dados_gravados', 'INTEGER NOT NULL DEFAULT 0');
 
 // Tabela de preços que vem junto com o programa.
 // Roda uma vez só: banco que já tem produtos não é tocado, e banco novo

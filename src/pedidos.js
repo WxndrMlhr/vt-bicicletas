@@ -1,5 +1,32 @@
 const db = require('./db');
 const { listaDeCores } = require('./produtos');
+const DadosCliente = require('./renderer/dados-cliente');
+
+// Endereço, CEP, documento e telefone da venda a prazo. Nenhum é
+// obrigatório: o que ficou em branco só não sai no papel. O que foi
+// preenchido errado (CPF que não confere, CEP pela metade) é recusado aqui,
+// venha a venda da tela de pedido ou de um orçamento aprovado — é a última
+// porta, e por isso ela confere de novo o que a tela já conferiu.
+//
+// Fora da venda a prazo esses campos não existem na tela e são ignorados.
+//
+// O que foi digitado vai também para a ficha do cliente (ver
+// clientes.clienteDaVenda). Roda dentro da transação do pedido: se o pedido
+// falhar, a ficha volta junto.
+//
+// Devolve o cliente_id da venda, os dados como vão gravados no pedido e se
+// eles valem (gravados = 1 só na venda a prazo).
+function prepararCliente({ cliente, cliente_id, formaPagamento, dadosCliente }) {
+  const vazio = { telefone: null, endereco: null, cep: null, documento_tipo: null, documento: null };
+  if (formaPagamento !== 'prazo') return { cliente_id, dados: vazio, gravados: 0 };
+
+  const digitados = dadosCliente || {};
+  const lista = DadosCliente.problemas(digitados);
+  if (lista.length > 0) throw new Error(DadosCliente.mensagemProblemas(lista));
+
+  const id = require('./clientes').clienteDaVenda({ cliente, cliente_id, dados: digitados });
+  return { cliente_id: id, dados: DadosCliente.normalizar(digitados), gravados: 1 };
+}
 
 // Retorna o preço de um produto para uma forma de pagamento específica.
 // Se o produto não tiver preço de retirada cadastrado, cai para o preço à vista.
@@ -114,21 +141,32 @@ function calcularPedido(itens, formaPagamento) {
 
 // Salva o pedido calculado no banco e devolve o id gerado.
 // Junto disso: dá baixa no estoque e, se for a prazo, abre a conta a receber.
-function salvarPedido({ cliente, cliente_id, formaPagamento, linhas, total, vencimento, meioPagamento, parcelas }) {
+// dadosCliente = { telefone, endereco, cep, documento_tipo, documento } — só
+// na venda a prazo, e todos opcionais (ver prepararCliente).
+function salvarPedido({ cliente, cliente_id, dadosCliente, formaPagamento, linhas, total, vencimento, meioPagamento, parcelas }) {
   const estoque = require('./estoque');
   const financeiro = require('./financeiro');
 
-  const inserirPedido = db.prepare(
-    `INSERT INTO pedidos (cliente, cliente_id, forma_pagamento, total, meio_pagamento)
-     VALUES (?, ?, ?, ?, ?)`
-  );
+  const inserirPedido = db.prepare(`
+    INSERT INTO pedidos (cliente, cliente_id, forma_pagamento, total, meio_pagamento,
+                         cliente_telefone, cliente_endereco, cliente_cep,
+                         cliente_documento_tipo, cliente_documento, cliente_dados_gravados)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
   const inserirItem = db.prepare(`
     INSERT INTO pedido_itens (pedido_id, produto_id, nome, cor, quantidade, preco_unitario, subtotal)
     VALUES (@pedido_id, @produto_id, @nome, @cor, @quantidade, @preco_unitario, @subtotal)
   `);
 
   const transacao = db.transaction(() => {
-    const info = inserirPedido.run(cliente || null, cliente_id || null, formaPagamento, total, meioPagamento || null);
+    const preparo = prepararCliente({ cliente, cliente_id, formaPagamento, dadosCliente });
+    cliente_id = preparo.cliente_id;
+    const d = preparo.dados;
+
+    const info = inserirPedido.run(
+      cliente || null, cliente_id || null, formaPagamento, total, meioPagamento || null,
+      d.telefone, d.endereco, d.cep, d.documento_tipo, d.documento, preparo.gravados
+    );
     const pedido_id = info.lastInsertRowid;
 
     for (const linha of linhas) {
@@ -182,7 +220,7 @@ function salvarPedido({ cliente, cliente_id, formaPagamento, linhas, total, venc
 //
 // Parcela já paga não é tocada: o dinheiro entrou de verdade. Ela continua
 // como está e o que sobra a cobrar é o total novo menos o que já foi pago.
-function atualizarPedido(id, { cliente, cliente_id, formaPagamento, linhas, total, meioPagamento, parcelas }) {
+function atualizarPedido(id, { cliente, cliente_id, dadosCliente, formaPagamento, linhas, total, meioPagamento, parcelas }) {
   const estoque = require('./estoque');
   const financeiro = require('./financeiro');
 
@@ -196,6 +234,12 @@ function atualizarPedido(id, { cliente, cliente_id, formaPagamento, linhas, tota
     if (!pedido) throw new Error(`Pedido #${id} não encontrado.`);
     if (pedido.cancelado) throw new Error(`O pedido #${id} está cancelado e não pode ser editado.`);
     if (!linhas || linhas.length === 0) throw new Error('O pedido precisa de pelo menos uma peça.');
+
+    // Antes de mexer em estoque e cobrança: se o documento ou o CEP vieram
+    // errados, nada muda.
+    const preparo = prepararCliente({ cliente, cliente_id, formaPagamento, dadosCliente });
+    cliente_id = preparo.cliente_id;
+    const d = preparo.dados;
 
     // 1) Devolve ao estoque o que a versão anterior tinha baixado.
     const anteriores = db.prepare('SELECT * FROM pedido_itens WHERE pedido_id = ?').all(id);
@@ -227,11 +271,14 @@ function atualizarPedido(id, { cliente, cliente_id, formaPagamento, linhas, tota
 
     db.prepare(`
       UPDATE pedidos
-      SET cliente = ?, cliente_id = ?, forma_pagamento = ?, total = ?, meio_pagamento = ?
+      SET cliente = ?, cliente_id = ?, forma_pagamento = ?, total = ?, meio_pagamento = ?,
+          cliente_telefone = ?, cliente_endereco = ?, cliente_cep = ?,
+          cliente_documento_tipo = ?, cliente_documento = ?, cliente_dados_gravados = ?
       WHERE id = ?
     `).run(
       cliente || null, cliente_id || null, formaPagamento, total,
-      meioPagamento || pedido.meio_pagamento || null, id
+      meioPagamento || pedido.meio_pagamento || null,
+      d.telefone, d.endereco, d.cep, d.documento_tipo, d.documento, preparo.gravados, id
     );
 
     // 3) Cobranças.
@@ -405,16 +452,30 @@ function buscarPedido(id) {
   `).all(id);
   pedido.vencimento = pedido.parcelas.length ? pedido.parcelas[0].vencimento : null;
 
-  // Contato do cliente cadastrado, para a via em folha A4 sair completa.
-  if (pedido.cliente_id) {
-    const c = db.prepare('SELECT nome, telefone, endereco FROM clientes WHERE id = ?')
-      .get(pedido.cliente_id);
-    if (c) {
-      pedido.cliente = pedido.cliente || c.nome;
-      pedido.telefone = c.telefone;
-      pedido.endereco = c.endereco;
-    }
+  // Contato do cliente, para o papel sair completo.
+  // - Venda a prazo gravada com os campos novos: vale só o que foi digitado
+  //   nela (o endereço de quando a venda foi feita). Campo deixado em branco
+  //   fica em branco — não sai no papel.
+  // - As demais (e as vendas a prazo de antes): telefone e endereço da ficha
+  //   do cliente, como sempre foi. CEP e documento, só na venda a prazo.
+  const c = pedido.cliente_id
+    ? db.prepare('SELECT nome, telefone, endereco FROM clientes WHERE id = ?').get(pedido.cliente_id) || {}
+    : {};
+  pedido.cliente = pedido.cliente || c.nome || null;
+  if (pedido.cliente_dados_gravados) {
+    pedido.telefone = pedido.cliente_telefone;
+    pedido.endereco = pedido.cliente_endereco;
+    pedido.cep = pedido.cliente_cep;
+    pedido.documento_tipo = pedido.cliente_documento_tipo;
+    pedido.documento = pedido.cliente_documento;
+  } else {
+    pedido.telefone = c.telefone || null;
+    pedido.endereco = c.endereco || null;
+    pedido.cep = null;
+    pedido.documento_tipo = null;
+    pedido.documento = null;
   }
+  pedido.documento_texto = DadosCliente.textoDocumento(pedido.documento_tipo, pedido.documento);
 
   return pedido;
 }

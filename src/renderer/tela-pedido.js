@@ -387,9 +387,117 @@
     });
   }
 
+  // ---------- Dados do cliente (endereço, CEP, documento, telefone) ----------
+  //
+  // O mesmo bloco de campos no pedido a prazo, na aprovação do orçamento a
+  // prazo e na ficha do cliente. Nenhum campo é obrigatório. Quem confere
+  // CPF, CNPJ e CEP é o dados-cliente.js, que a tela precisa carregar antes
+  // deste arquivo.
+  const PLACEHOLDER_DOC = { cpf: '000.000.000-00', cnpj: '00.000.000/0000-00', rg: 'Número do RG' };
+
+  function camposCliente(prefixo) {
+    const id = campo => `${prefixo}-${campo}`;
+    return `
+      <div class="dados-cliente" data-prefixo="${prefixo}">
+        <div class="dc-endereco">
+          <label class="campo" for="${id('endereco')}">Endereço</label>
+          <input type="text" id="${id('endereco')}" data-campo="endereco" autocomplete="off"
+                 placeholder="Rua, número, bairro, cidade">
+        </div>
+        <div class="dc-cep">
+          <label class="campo" for="${id('cep')}">CEP</label>
+          <input type="text" id="${id('cep')}" data-campo="cep" inputmode="numeric" maxlength="10"
+                 autocomplete="off" placeholder="00000-000">
+        </div>
+        <div class="dc-documento">
+          <label class="campo" for="${id('documento')}">Documento</label>
+          <div class="doc-junto">
+            <select data-campo="documento_tipo" aria-label="Tipo de documento">
+              <option value="cpf">CPF</option>
+              <option value="cnpj">CNPJ</option>
+              <option value="rg">RG</option>
+            </select>
+            <input type="text" id="${id('documento')}" data-campo="documento" autocomplete="off"
+                   placeholder="${PLACEHOLDER_DOC.cpf}">
+          </div>
+        </div>
+        <div class="dc-telefone">
+          <label class="campo" for="${id('telefone')}">Telefone</label>
+          <input type="text" id="${id('telefone')}" data-campo="telefone" autocomplete="off"
+                 placeholder="(21) 90000-0000">
+        </div>
+        <div class="dc-aviso"></div>
+      </div>`;
+  }
+
+  const campoDe = (bloco, campo) => bloco.querySelector(`[data-campo="${campo}"]`);
+
+  function lerCamposCliente(bloco) {
+    const dados = {};
+    for (const campo of ['telefone', 'endereco', 'cep', 'documento_tipo', 'documento']) {
+      dados[campo] = campoDe(bloco, campo).value.trim();
+    }
+    return dados;
+  }
+
+  function preencherCamposCliente(bloco, dados = {}) {
+    for (const campo of ['telefone', 'endereco', 'cep', 'documento']) {
+      campoDe(bloco, campo).value = dados[campo] || '';
+    }
+    campoDe(bloco, 'documento_tipo').value = dados.documento_tipo || 'cpf';
+    campoDe(bloco, 'documento').placeholder = PLACEHOLDER_DOC[campoDe(bloco, 'documento_tipo').value];
+    marcarProblemas(bloco, []);
+  }
+
+  // Pinta os campos preenchidos errado e escreve o porquê embaixo do bloco.
+  // lista = [{ campo, texto }], como devolve DadosCliente.problemas.
+  function marcarProblemas(bloco, lista, { focar = false } = {}) {
+    bloco.querySelectorAll('input.invalido').forEach(c => c.classList.remove('invalido'));
+    lista.forEach(p => campoDe(bloco, p.campo).classList.add('invalido'));
+    bloco.querySelector('.dc-aviso').textContent = DadosCliente.mensagemProblemas(lista);
+    if (focar && lista.length) campoDe(bloco, lista[0].campo).focus();
+  }
+
+  // Arruma CEP e documento quando a pessoa sai do campo, e avisa na hora se
+  // o CPF/CNPJ não confere — melhor descobrir agora do que na hora de salvar.
+  // aoMudar() é chamado a cada alteração (para o rascunho).
+  function ligarCamposCliente(bloco, aoMudar = () => {}) {
+    const tipo = campoDe(bloco, 'documento_tipo');
+    const doc = campoDe(bloco, 'documento');
+    const cep = campoDe(bloco, 'cep');
+
+    function conferirDoc() {
+      const texto = doc.value.trim();
+      if (!texto) { doc.classList.remove('invalido'); return; }
+      tipo.value = DadosCliente.adivinharTipo(tipo.value, texto);
+      doc.placeholder = PLACEHOLDER_DOC[tipo.value];
+      const r = DadosCliente.conferirDocumento(tipo.value, texto);
+      if (r.ok) doc.value = r.valor;
+      doc.classList.toggle('invalido', !r.ok);
+      bloco.querySelector('.dc-aviso').textContent = r.ok ? '' : `Documento: ${r.erro}.`;
+    }
+
+    doc.addEventListener('blur', conferirDoc);
+    tipo.addEventListener('change', () => {
+      doc.placeholder = PLACEHOLDER_DOC[tipo.value];
+      conferirDoc();
+      aoMudar();
+    });
+    cep.addEventListener('blur', () => {
+      const certo = DadosCliente.formatarCEP(cep.value);
+      if (certo) cep.value = certo;
+      cep.classList.toggle('invalido', !!cep.value.trim() && !certo);
+    });
+    bloco.addEventListener('input', (e) => {
+      e.target.classList.remove('invalido');
+      aoMudar();
+    });
+  }
+
   window.TelaPedido = {
     pintarItens, criarRascunho, avisarRascunho, ligarSetas, precoParaCampo, precoDoCampo,
     adicionarPeca, trocarCor, outraCor, seletorCor, linhasSemCor, confirmarCores,
-    datasDasParcelas, estenderDatas, seguirData, mostrarDatas
+    datasDasParcelas, estenderDatas, seguirData, mostrarDatas,
+    camposCliente, lerCamposCliente, preencherCamposCliente, marcarProblemas, ligarCamposCliente
   };
 })();
