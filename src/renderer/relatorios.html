@@ -4,13 +4,28 @@
   <meta charset="UTF-8">
   <title>Relatórios — VT Bicicletas</title>
   <link rel="stylesheet" href="estilo.css">
+  <style>
+    /* A barra de imprimir/PDF, separada dos filtros por um risco:
+       escolher o período é uma coisa, mandar para o papel é outra. */
+    .acoes-papel {
+      margin-top: 0.9rem;
+      padding-top: 0.9rem;
+      border-top: 1px solid var(--aco-100);
+    }
+    .periodo-atual {
+      margin-right: auto;
+      color: var(--aco-500);
+      font-size: 0.85rem;
+    }
+  </style>
 </head>
 <body>
   <script src="menu.js"></script>
 
   <main class="conteudo">
-    <h1 class="titulo-pagina">Relatórios</h1>
-    <p class="subtitulo-pagina">Quanto entrou, o que mais saiu e de onde vem o faturamento.</p>
+    <h1 class="titulo-pagina">Relatórios do atacado</h1>
+    <p class="subtitulo-pagina">Quanto entrou no atacado, de quais clientes e de que jeito pagaram.
+      Venda de balcão não entra nestas contas.</p>
 
     <div class="cartao">
       <div class="filtros">
@@ -24,54 +39,59 @@
         </div>
         <button class="escuro" id="btn-gerar">Ver período</button>
         <div class="direita">
-          <button class="neutro mini" data-dias="0">Hoje</button>
-          <button class="neutro mini" data-dias="7">7 dias</button>
-          <button class="neutro mini" data-dias="30">30 dias</button>
-          <button class="neutro mini" data-dias="365">1 ano</button>
+          <button class="neutro mini" data-periodo="hoje">Hoje</button>
+          <button class="neutro mini" data-periodo="7dias">7 dias</button>
+          <button class="neutro mini" data-periodo="mes">Este mês</button>
+          <button class="neutro mini" data-periodo="ano">Este ano</button>
         </div>
+      </div>
+
+      <!-- Imprimir e PDF saem do mesmo período que está na tela: os dois
+           atualizam os números antes de mandar para o papel.
+
+           São formatos diferentes de propósito: imprimir sai na térmica de
+           80mm (a impressora da loja), e o PDF sai em folha A4, para
+           arquivar e mandar pelo WhatsApp. -->
+      <div class="acoes acoes-papel">
+        <span class="periodo-atual" id="periodo-atual">—</span>
+        <button class="neutro" id="btn-pdf">Baixar PDF</button>
+        <button class="escuro" id="btn-imprimir">Imprimir cupom</button>
       </div>
     </div>
 
-    <div class="grade-4" style="margin-bottom: 1.1rem;">
+    <div class="grade-3" style="margin-bottom: 1.1rem;">
       <div class="indicador destaque"><div class="rotulo">Faturamento</div><div class="valor" id="i-fat">—</div></div>
       <div class="indicador"><div class="rotulo">Pedidos</div><div class="valor" id="i-ped">—</div></div>
       <div class="indicador"><div class="rotulo">Ticket médio</div><div class="valor" id="i-tic">—</div></div>
-      <div class="indicador"><div class="rotulo">Peças vendidas</div><div class="valor" id="i-ite">—</div></div>
     </div>
 
-    <div class="grade-larga">
-      <div class="cartao">
-        <h2 class="secao">Peças que mais saíram</h2>
+    <div class="cartao">
+      <h2 class="secao">Clientes do período</h2>
+      <div class="rolagem">
         <table>
-          <thead><tr><th>Peça</th><th class="num">Qtd</th><th class="num">Faturou</th></tr></thead>
-          <tbody id="t-vendidos"></tbody>
+          <thead><tr><th>Cliente</th><th class="num">Pedidos</th><th class="num">Total</th></tr></thead>
+          <tbody id="t-clientes"></tbody>
         </table>
       </div>
+    </div>
 
-      <div>
-        <div class="cartao">
-          <h2 class="secao">Movimento por dia</h2>
+    <div class="grade-2">
+      <div class="cartao">
+        <h2 class="secao">Movimento por dia</h2>
+        <div class="rolagem">
           <table>
             <thead><tr><th>Dia</th><th class="num">Pedidos</th><th class="num">Faturou</th></tr></thead>
             <tbody id="t-dias"></tbody>
           </table>
         </div>
+      </div>
 
-        <div class="cartao">
-          <h2 class="secao">Como pagaram</h2>
-          <table>
-            <thead><tr><th>Forma</th><th class="num">Pedidos</th><th class="num">Faturou</th></tr></thead>
-            <tbody id="t-formas"></tbody>
-          </table>
-        </div>
-
-        <div class="cartao">
-          <h2 class="secao">Por categoria</h2>
-          <table>
-            <thead><tr><th>Categoria</th><th class="num">Qtd</th><th class="num">Faturou</th></tr></thead>
-            <tbody id="t-categorias"></tbody>
-          </table>
-        </div>
+      <div class="cartao">
+        <h2 class="secao">Como pagaram</h2>
+        <table>
+          <thead><tr><th>Forma</th><th class="num">Pedidos</th><th class="num">Faturou</th></tr></thead>
+          <tbody id="t-formas"></tbody>
+        </table>
       </div>
     </div>
   </main>
@@ -96,38 +116,39 @@
       return `<tr><td colspan="${colunas}" class="vazio">${texto}</td></tr>`;
     }
 
-    function definirPeriodo(dias) {
+    // Hoje, este mês e este ano são os períodos que a loja fecha no papel.
+    // Mês e ano terminam HOJE, e não no fim do calendário: relatório não
+    // inventa dia que ainda não chegou.
+    function definirPeriodo(tipo) {
       const hoje = new Date();
-      const inicio = new Date();
-      inicio.setDate(hoje.getDate() - dias);
+      const inicio = new Date(hoje);
+      if (tipo === 'mes') {
+        inicio.setDate(1);
+      } else if (tipo === 'ano') {
+        inicio.setMonth(0);
+        inicio.setDate(1);
+      } else if (tipo === '7dias') {
+        inicio.setDate(hoje.getDate() - 6);
+      }
+      // 'hoje' fica com início e fim no mesmo dia.
       inicioEl.value = paraISO(inicio);
       fimEl.value = paraISO(hoje);
     }
 
+    // Devolve true quando os números da tela estão atualizados — os botões de
+    // imprimir e de PDF só seguem adiante nesse caso.
     async function gerar() {
-      if (!inicioEl.value || !fimEl.value) { avisar('Escolha as duas datas.', 'atencao'); return; }
-      if (inicioEl.value > fimEl.value) { avisar('A data inicial vem antes da final.', 'atencao'); return; }
+      if (!inicioEl.value || !fimEl.value) { avisar('Escolha as duas datas.', 'atencao'); return false; }
+      if (inicioEl.value > fimEl.value) { avisar('A data inicial vem antes da final.', 'atencao'); return false; }
 
       const r = await window.erpAPI.relatorios.gerar(inicioEl.value, fimEl.value);
-      const semVenda = 'Nenhuma venda nesse período.';
+      const semVenda = 'Nenhuma venda de atacado nesse período.';
+
+      document.getElementById('periodo-atual').textContent = r.periodo.titulo;
 
       document.getElementById('i-fat').textContent = real(r.resumo.faturamento);
       document.getElementById('i-ped').textContent = r.resumo.quantidade_pedidos;
       document.getElementById('i-tic').textContent = real(r.resumo.ticket_medio);
-      document.getElementById('i-ite').textContent = r.resumo.total_itens;
-
-      const maxQtd = r.maisVendidos.length ? r.maisVendidos[0].quantidade : 0;
-      document.getElementById('t-vendidos').innerHTML = r.maisVendidos.length
-        ? r.maisVendidos.map(i => `
-            <tr>
-              <td>
-                ${escapar(i.nome)}
-                <div class="barra-fundo"><div class="barra" style="width:${maxQtd ? (i.quantidade / maxQtd) * 100 : 0}%"></div></div>
-              </td>
-              <td class="num" style="font-weight:700;">${i.quantidade}</td>
-              <td class="num">${real(i.faturamento)}</td>
-            </tr>`).join('')
-        : vazio(3, semVenda);
 
       document.getElementById('t-dias').innerHTML = r.porDia.length
         ? r.porDia.map(d => `
@@ -144,26 +165,68 @@
             </tr>`).join('')
         : vazio(3, semVenda);
 
-      document.getElementById('t-categorias').innerHTML = r.categorias.length
-        ? r.categorias.map(c => `
+      // A barra mostra o peso de cada cliente no período sem precisar de
+      // conta: o maior enche a linha, os outros aparecem na proporção dele.
+      const maiorCliente = r.clientes.length ? r.clientes[0].faturamento : 0;
+      document.getElementById('t-clientes').innerHTML = r.clientes.length
+        ? r.clientes.map(c => `
             <tr>
-              <td>${escapar(c.categoria)}</td>
-              <td class="num">${c.quantidade}</td>
-              <td class="num">${real(c.faturamento)}</td>
+              <td>
+                ${escapar(c.cliente)}
+                <div class="barra-fundo"><div class="barra" style="width:${maiorCliente ? (c.faturamento / maiorCliente) * 100 : 0}%"></div></div>
+              </td>
+              <td class="num">${c.pedidos}</td>
+              <td class="num" style="font-weight:700;">${real(c.faturamento)}</td>
             </tr>`).join('')
         : vazio(3, semVenda);
+
+      return true;
     }
 
     document.getElementById('btn-gerar').addEventListener('click', gerar);
 
-    document.querySelectorAll('button[data-dias]').forEach(botao => {
+    document.querySelectorAll('button[data-periodo]').forEach(botao => {
       botao.addEventListener('click', () => {
-        definirPeriodo(Number(botao.dataset.dias));
+        definirPeriodo(botao.dataset.periodo);
         gerar();
       });
     });
 
-    definirPeriodo(30);
+    // --- Para o papel ---
+    //
+    // O PDF e a impressão são montados no processo principal, a partir do
+    // banco: o que vai na folha é o período escolhido aqui, não a tabela que
+    // está desenhada na tela. Por isso o gerar() vem primeiro — assim o que
+    // a pessoa confere é o mesmo que ela leva impresso.
+    async function paraOPapel(botao, trabalhando, acao, queixa) {
+      // Trancar o botão é a primeira coisa: dois cliques seguidos abririam
+      // duas janelas do Windows ao mesmo tempo, que é o que trava o sistema
+      // (o porquê está todo no dialogos.js).
+      const rotulo = botao.textContent;
+      botao.disabled = true;
+      try {
+        if (await gerar()) {
+          botao.textContent = trabalhando;
+          await acao(inicioEl.value, fimEl.value);
+        }
+      } catch (erro) {
+        avisar(`${queixa}: ${motivo(erro)}`, 'erro');
+      }
+      botao.disabled = false;
+      botao.textContent = rotulo;
+    }
+
+    document.getElementById('btn-pdf').addEventListener('click', (ev) =>
+      paraOPapel(ev.target, 'Gerando...',
+        (inicio, fim) => window.erpAPI.relatorios.salvarPDF(inicio, fim, { abrirDepois: true }),
+        'Não deu para gerar o PDF'));
+
+    document.getElementById('btn-imprimir').addEventListener('click', (ev) =>
+      paraOPapel(ev.target, 'Imprimindo...',
+        (inicio, fim) => window.erpAPI.relatorios.imprimir(inicio, fim),
+        'Não deu para imprimir'));
+
+    definirPeriodo('mes');
     gerar();
   </script>
 </body>

@@ -87,7 +87,12 @@ contextBridge.exposeInMainWorld('erpAPI', {
   },
 
   relatorios: {
-    gerar: (inicio, fim) => ipcRenderer.invoke('relatorios:gerar', inicio, fim)
+    gerar: (inicio, fim) => ipcRenderer.invoke('relatorios:gerar', inicio, fim),
+    // O relatório em papel: PDF é folha A4, para arquivar e mandar pelo
+    // WhatsApp; imprimir sai em cupom, na térmica da loja.
+    salvarPDF: (inicio, fim, opcoes) => ipcRenderer.invoke('relatorios:pdf', inicio, fim, opcoes),
+    imprimir: (inicio, fim, opcoes) => ipcRenderer.invoke('relatorios:imprimir', inicio, fim, opcoes),
+    abrirPasta: () => ipcRenderer.invoke('relatorios:abrirPasta')
   },
 
   clientes: {

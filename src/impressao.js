@@ -16,17 +16,66 @@ const TEMPO_IMPRESSAO = 5 * 60 * 1000;     // esperar a resposta do diálogo
 //   larguraMM      -> largura ÚTIL de impressão (72 para papel de 80mm,
 //                     48 para papel de 58mm)
 function imprimirPedido(pedido, opcoes = {}) {
+  return naTermica({
+    pagina: 'recibo.html',
+    rotulo: 'Imprimir cupom',
+    opcoes,
+    dados: (larguraMM) => [pedido, { larguraMM, pagamento: pixDoPedido(pedido, opcoes) }]
+  });
+}
+
+// O relatório de vendas no mesmo rolo de papel do cupom.
+//
+// Existe porque a impressora padrão da loja é a térmica de 80mm, e não há
+// impressora de folha: mandar o A4 para ela encolhe a página para um terço
+// do tamanho e o relatório sai ilegível. Em cupom, sai no tamanho certo.
+// A folha A4 continua existindo, no botão de PDF — para arquivar e mandar
+// pelo WhatsApp, onde não há papel para atrapalhar.
+function imprimirRelatorio(relatorio, opcoes = {}) {
+  return naTermica({
+    pagina: 'relatorio-cupom.html',
+    rotulo: 'Imprimir relatório',
+    opcoes,
+    dados: (larguraMM) => [relatorio, { larguraMM }]
+  });
+}
+
+// O caminho comum dos dois: lê a configuração da impressora e, quando a
+// impressão abre o diálogo do Windows, pega a tranca antes.
+//
+// Com diálogo, o cupom disputa a mesma tranca do "Salvar como" e da folha
+// A4: são todos modais da mesma janela, e dois deles abertos ao mesmo
+// tempo é o que fazia o sistema parar de aceitar teclado. Silencioso não
+// abre janela nenhuma, então passa direto.
+function naTermica({ pagina, rotulo, opcoes, dados }) {
   const salvo = configuracoes.opcoesDeImpressao();
   const silencioso = opcoes.silencioso ?? salvo.silenciosa;
+  const mandar = () => mandarParaTermica({ pagina, dados, opcoes, salvo, silencioso });
 
-  // Com diálogo, o cupom disputa a mesma tranca do "Salvar como" e da folha
-  // A4: são todos modais da mesma janela, e dois deles abertos ao mesmo
-  // tempo é o que fazia o sistema parar de aceitar teclado. Silencioso não
-  // abre janela nenhuma, então passa direto.
-  return silencioso
-    ? mandarCupom(pedido, opcoes, salvo, silencioso)
-    : dialogos.exclusivo('Imprimir cupom',
-        () => mandarCupom(pedido, opcoes, salvo, silencioso));
+  return silencioso ? mandar() : dialogos.exclusivo(rotulo, mandar);
+}
+
+// O bloco de PIX do cupom do pedido.
+//
+// No balcão ele não sai. O cliente pagou na hora e está indo embora: um QR
+// de "pague por PIX" no comprovante dele não serve para nada — serve no
+// orçamento e no pedido a prazo, que é quem paga depois.
+//
+// A regra olha a forma de pagamento, e não a tela que mandou imprimir, para
+// a reimpressão pelo Histórico sair igual à primeira via. É o mesmo
+// documento; sair diferente conforme o caminho é defeito.
+//
+// A impressão de teste força `comPix` porque é justamente nela que se
+// confere a altura do cupom inteiro, com o QR no pé.
+function pixDoPedido(pedido, opcoes) {
+  const comPix = opcoes.comPix ?? (pedido.forma_pagamento !== 'balcao');
+  if (!comPix) return null;
+  try {
+    return require('./pagamento').dados();
+  } catch (erro) {
+    console.error('[impressao] cupom sem bloco de pagamento:', erro.message);
+    return null;
+  }
 }
 
 // O pageSize do Electron fala em micra; o navegador mede em px de tela, que
@@ -77,7 +126,10 @@ function tamanhoDaPagina(larguraMM, alturaMicra) {
   };
 }
 
-function mandarCupom(pedido, opcoes, salvo, silencioso) {
+// O motor: monta a página numa janela oculta, mede a altura do que ficou e
+// manda para a térmica. O que muda entre o cupom do pedido e o do relatório
+// é só a página e o que ela recebe — a mecânica do papel é a mesma.
+function mandarParaTermica({ pagina, dados, opcoes, salvo, silencioso }) {
   const nomeImpressora = opcoes.nomeImpressora ?? salvo.impressora;
   const larguraMM = opcoes.larguraMM ?? salvo.larguraMM;
   // tempoLimite existe para os testes exercitarem a rede de segurança.
@@ -150,33 +202,13 @@ function mandarCupom(pedido, opcoes, salvo, silencioso) {
     });
 
     janela.webContents.once('did-finish-load', () => {
-      // O bloco de pagamento vai montado daqui: o cupom não precisa saber
-      // desenhar QR, e o mesmo código serve para a folha A4.
-      //
-      // No balcão ele não sai. O cliente pagou na hora e está indo embora:
-      // um QR de "pague por PIX" no comprovante dele não serve para nada —
-      // serve no orçamento e no pedido a prazo, que é quem paga depois.
-      //
-      // A regra olha a forma de pagamento, e não a tela que mandou imprimir,
-      // para a reimpressão pelo Histórico sair igual à primeira via. É o
-      // mesmo documento; sair diferente conforme o caminho é defeito.
-      //
-      // A impressão de teste força `comPix` porque é justamente nela que se
-      // confere a altura do cupom inteiro, com o QR no pé.
-      const comPix = opcoes.comPix ?? (pedido.forma_pagamento !== 'balcao');
-
-      let pagamento = null;
-      if (comPix) {
-        try {
-          pagamento = require('./pagamento').dados();
-        } catch (erro) {
-          console.error('[impressao] cupom sem bloco de pagamento:', erro.message);
-        }
-      }
-      janela.webContents.send('recibo:dados', pedido, { larguraMM, pagamento });
+      // Quem sabe o que a página precisa receber é quem pediu a impressão:
+      // o cupom do pedido monta aqui o bloco de PIX, o do relatório não tem
+      // nenhum. O motor só entrega.
+      janela.webContents.send('recibo:dados', ...dados(larguraMM));
     });
 
-    janela.loadFile(path.join(__dirname, 'renderer', 'recibo.html'))
+    janela.loadFile(path.join(__dirname, 'renderer', pagina))
       .catch(finalizar);
   });
 }
@@ -242,4 +274,4 @@ function deduzirLargura(papeis) {
   return null;
 }
 
-module.exports = { imprimirPedido, listarImpressoras, papeisDaImpressora };
+module.exports = { imprimirPedido, imprimirRelatorio, listarImpressoras, papeisDaImpressora };

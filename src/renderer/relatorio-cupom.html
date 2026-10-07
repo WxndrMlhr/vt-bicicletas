@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Relatório — cupom</title>
+  <style>
+    /* O relatório de vendas no rolo da mini impressora.
+       Mesma mecânica do recibo.html — se mudar lá, confira aqui. */
+
+    /* LARGURA ÚTIL DE IMPRESSÃO — não é a largura do papel.
+       Papel de 80mm imprime ~72mm; papel de 58mm imprime ~48mm.
+       Vem da tela de Configurações; o valor aqui é só o de segurança. */
+    :root { --largura-papel: 72mm; }
+
+    @page { margin: 0; }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 10mm 4mm 8mm;
+      width: var(--largura-papel);
+      font-family: "Courier New", monospace;
+      font-size: 11px;
+      /* Tudo em negrito de propósito: a térmica marca o papel por pontos e
+         traço fino sai cinza. O porquê completo está no recibo.html. */
+      font-weight: 700;
+      line-height: 1.35;
+      color: #000;
+      background: #fff;
+    }
+
+    .centro { text-align: center; }
+    .loja { font-size: 15px; }
+    .doc { font-size: 12px; margin-top: 1mm; }
+    .sub { font-size: 10px; }
+
+    hr {
+      border: none;
+      border-top: 1px dashed #000;
+      margin: 6px 0;
+    }
+
+    /* Rótulo à esquerda, valor à direita, na mesma linha. É a forma de
+       quase tudo neste cupom. */
+    .linha {
+      display: flex;
+      justify-content: space-between;
+      gap: 4px;
+    }
+    .linha .valor { white-space: nowrap; }
+
+    /* Título de seção: o cupom é uma coluna só, então o que separa um
+       assunto do outro é esta faixa. */
+    .secao {
+      font-size: 11px;
+      text-align: center;
+      margin: 2px 0 3px;
+      border-bottom: 1px solid #000;
+      padding-bottom: 1px;
+    }
+
+    /* Nome comprido ocupa a linha inteira e quebra; o valor vem embaixo,
+         à direita. Encolher a letra para caber na mesma linha era o que
+       deixava o cupom ilegível. */
+    .nome { font-size: 10.5px; }
+    .detalhe { font-size: 10px; }
+
+    .grupo { margin-bottom: 3px; }
+
+    .destaque {
+      font-size: 14px;
+      margin-top: 4px;
+    }
+
+    .rodape {
+      text-align: center;
+      font-size: 9.5px;
+      margin-top: 8px;
+    }
+
+    .vazio { text-align: center; font-size: 10.5px; margin: 6px 0; }
+    .oculto { display: none; }
+  </style>
+</head>
+<body>
+  <div class="centro loja">V.T. BICICLETAS</div>
+  <div class="centro doc">VENDAS NO ATACADO</div>
+  <div class="centro sub" id="periodo">—</div>
+  <div class="centro sub" id="emitido">—</div>
+
+  <hr>
+
+  <div class="linha destaque">
+    <span>FATUROU</span>
+    <span class="valor" id="faturamento">—</span>
+  </div>
+  <div class="linha"><span>Pedidos</span><span class="valor" id="pedidos">—</span></div>
+  <div class="linha"><span>Ticket médio</span><span class="valor" id="ticket">—</span></div>
+
+  <div class="vazio oculto" id="sem-venda">Nenhuma venda de<br>atacado neste período.</div>
+
+  <div id="tudo" class="oculto">
+    <hr>
+    <div class="secao">COMO PAGARAM</div>
+    <div id="formas"></div>
+
+    <hr>
+    <div class="secao">CLIENTES DO PERÍODO</div>
+    <div id="clientes"></div>
+
+    <div id="bloco-dias" class="oculto">
+      <hr>
+      <div class="secao">MOVIMENTO POR DIA</div>
+      <div id="dias"></div>
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="linha destaque">
+    <span>TOTAL</span>
+    <span class="valor" id="total-fim">—</span>
+  </div>
+
+  <div class="rodape">
+    Relatório interno de conferência.<br>
+    Não é documento fiscal.<br>
+    Só atacado: balcão e pedidos<br>
+    cancelados não entram.
+  </div>
+
+  <script>
+    const real = v => (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    const esc = t => String(t ?? '').replace(/[<>&]/g,
+      c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+
+    // Nomes curtos: a coluna tem 64mm e o nome divide a linha com o valor.
+    const nomesForma = {
+      balcao: 'Balcão',
+      prazo: 'A prazo',
+      vista: 'À vista',
+      vista_retirada: 'À vista retirada'
+    };
+
+    const diaMes = iso => String(iso ?? '').slice(5, 10).split('-').reverse().join('/');
+
+    window.erpAPI.aoReceberRecibo((r, opcoes) => {
+      if (opcoes && opcoes.larguraMM > 0) {
+        document.documentElement.style.setProperty('--largura-papel', `${opcoes.larguraMM}mm`);
+      }
+
+      const temVenda = r.resumo.quantidade_pedidos > 0;
+
+      document.getElementById('periodo').textContent = r.periodo?.titulo || '';
+      document.getElementById('emitido').textContent =
+        'Emitido em ' + new Date().toLocaleString('pt-BR', {
+          day: '2-digit', month: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit'
+        });
+
+      document.getElementById('faturamento').textContent = real(r.resumo.faturamento);
+      document.getElementById('total-fim').textContent = real(r.resumo.faturamento);
+      document.getElementById('pedidos').textContent = r.resumo.quantidade_pedidos;
+      document.getElementById('ticket').textContent = real(r.resumo.ticket_medio);
+
+      document.getElementById('sem-venda').classList.toggle('oculto', temVenda);
+      document.getElementById('tudo').classList.toggle('oculto', !temVenda);
+
+      document.getElementById('formas').innerHTML = (r.formasPagamento || []).map(f => `
+        <div class="linha">
+          <span>${nomesForma[f.forma_pagamento] || esc(f.forma_pagamento)} (${f.pedidos})</span>
+          <span class="valor">${real(f.faturamento)}</span>
+        </div>`).join('');
+
+      // Nome numa linha, quantidade e valor na de baixo: é o jeito do cupom
+      // do pedido, e o único que não corta nome de cliente comprido.
+      document.getElementById('clientes').innerHTML = (r.clientes || []).map(c => `
+        <div class="grupo">
+          <div class="nome">${esc(c.cliente)}</div>
+          <div class="linha detalhe">
+            <span>${c.pedidos} ${c.pedidos === 1 ? 'pedido' : 'pedidos'}</span>
+            <span class="valor">${real(c.faturamento)}</span>
+          </div>
+        </div>`).join('');
+
+      const porDia = r.porDia || [];
+      document.getElementById('bloco-dias').classList.toggle('oculto', porDia.length <= 1);
+      document.getElementById('dias').innerHTML = porDia.map(d => `
+        <div class="linha">
+          <span>${diaMes(d.dia)} (${d.pedidos})</span>
+          <span class="valor">${real(d.faturamento)}</span>
+        </div>`).join('');
+
+      window.erpAPI.reciboPronto();
+    });
+  </script>
+</body>
+</html>

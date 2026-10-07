@@ -8,6 +8,7 @@ const orcamentoPdf = require('./orcamento-pdf');
 const pedidoPdf = require('./pedido-pdf');
 const impressao = require('./impressao');
 const relatorios = require('./relatorios');
+const relatorioPdf = require('./relatorio-pdf');
 const clientes = require('./clientes');
 const estoque = require('./estoque');
 const financeiro = require('./financeiro');
@@ -27,6 +28,20 @@ function createWindow() {
       nodeIntegration: false
     }
   });
+
+  // Com ERP_DADOS o banco é outro — uma cópia de teste, nunca o da loja
+  // (ver db.js). A barra da janela precisa dizer isso, senão não há como
+  // saber se a venda que se está lançando vale ou não.
+  //
+  // É por aqui e não pelo `title` lá em cima porque cada tela tem o seu
+  // <title> ('Balcão — VT Bicicletas'), que substitui o da janela assim que
+  // a página carrega. Aqui o nome da tela é mantido e o aviso vai junto.
+  if (process.env.ERP_DADOS) {
+    win.on('page-title-updated', (evento, titulo) => {
+      evento.preventDefault();
+      win.setTitle(`${titulo}  —  AMBIENTE DE TESTE`);
+    });
+  }
 
   win.loadFile(path.join(__dirname, 'renderer', 'balcao.html'));
 
@@ -198,6 +213,25 @@ ipcMain.handle('pagamento:pix', (e, valor) =>
 ipcMain.handle('relatorios:gerar', (event, inicio, fim) =>
   relatorios.relatorioCompleto(inicio, fim)
 );
+
+// O relatório em papel, nos dois formatos que a loja usa.
+//
+// Os números são recalculados aqui, do banco — e não recebidos da tela: o
+// papel nunca sai de um resumo que ficou velho enquanto a tela estava aberta.
+//
+// PDF é folha A4, para arquivar e mandar pelo WhatsApp.
+ipcMain.handle('relatorios:pdf', async (e, inicio, fim, opcoes) =>
+  await relatorioPdf.salvarComoPDF(relatorios.relatorioCompleto(inicio, fim), opcoes || {})
+);
+
+// Imprimir é cupom, na mesma térmica do pedido. A impressora da loja é de
+// 80mm e não existe impressora de folha: o A4 mandado para ela sai encolhido
+// a um terço do tamanho, ilegível.
+ipcMain.handle('relatorios:imprimir', async (e, inicio, fim, opcoes) =>
+  await impressao.imprimirRelatorio(relatorios.relatorioCompleto(inicio, fim), opcoes || {})
+);
+
+ipcMain.handle('relatorios:abrirPasta', () => relatorioPdf.abrirPastaRelatorios());
 
 // --- Clientes ---
 ipcMain.handle('clientes:listar', () => clientes.listarClientes());
